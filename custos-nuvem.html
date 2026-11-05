@@ -1,0 +1,70 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lobo Industrial — Custos na nuvem</title><style>
+body{font:15px system-ui,Arial;background:#f5f7fa;color:#172b42;margin:0}main{max-width:1100px;margin:28px auto;background:#fff;padding:24px;border-radius:12px}h1{font-size:24px}h2{font-size:19px}label{display:block;margin:12px 0 4px;font-weight:600}input,select,button{font:inherit;padding:10px;border:1px solid #b4c1cf;border-radius:7px}input,select{width:100%;box-sizing:border-box}button{background:#193d5b;color:white;cursor:pointer;margin:12px 8px 0 0}button:disabled{opacity:.5}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.muted{color:#586c80}table{width:100%;border-collapse:collapse;margin:15px 0}th,td{padding:9px;border-bottom:1px solid #e0e6ee;text-align:left}section[hidden]{display:none}#status{white-space:pre-wrap}.totals{background:#edf3f8;padding:14px;border-radius:8px;margin:15px 0}</style></head><body><main>
+<h1>Composição de custos — Supabase</h1><p class="muted">Protótipo de testes. Valores totais são distribuídos por peças cortadas; insumos de acabamento são calculados somente para peças boas. Não utilizar dados reais até validar as regras com a produção.</p>
+<section id="auth"><form id="login"><label>E-mail<input id="email" type="email" autocomplete="username" required></label><label>Senha<input id="password" type="password" autocomplete="current-password" required></label><button id="enter">Entrar</button></form></section>
+<section id="app" hidden><p id="identity"></p><form id="cost-form"><label>Lote de produção<select id="lot" required></select></label><div class="grid"><label>Peças cortadas<input id="cutPieces" type="number" min="1" step="1" required></label><label>Peças boas para vender<input id="goodPieces" type="number" min="0" step="1" required></label><label>Avarias<input id="damagedPieces" type="number" min="0" step="1" required></label></div>
+<h2>Custos totais do lote (R$)</h2><div class="grid" id="total-fields"></div><h2>Custos por peça (R$)</h2><div class="grid" id="unit-fields"></div><div class="totals" id="preview">Preencha as quantidades para calcular.</div>
+<button id="save">Salvar custos no Supabase</button><button type="button" id="cancel">Cancelar edição</button></form>
+<button type="button" id="reload">Atualizar do banco</button><button type="button" id="logout">Sair</button>
+<h2>Custos cadastrados</h2><table><thead><tr><th>Lote</th><th>Peças boas</th><th>Avarias</th><th>Total</th><th>Unitário bom</th><th>Ação</th></tr></thead><tbody id="rows"></tbody></table></section><p id="status" role="status"></p></main>
+<script type="module">
+import { LoboCloudController } from './src/cloud-controller.js';
+const URL='https://yldgebyfflbacicsfseh.supabase.co',KEY='sb_publishable_5GCZ1S_XsQXLfmJbn94WmA_hINR9q38',$=id=>document.getElementById(id);
+const totals=[['fabric','Malha'],['collarCuff','Gola / punho'],['ribana','Ribana'],['freightFabric','Frete da malha']];
+const units=[['cut','Corte'],['sewing','Costura'],['printing','Serigrafia'],['embroidery','Bordado'],['interlining','Entretela'],['tag','Tag'],['seal','Lacre'],['bags','Saquinhos'],['composition','Composição'],['courier','Frete motoboy']];
+const goodOnly=new Set(['tag','seal','bags','composition']);
+let session=null,lots=[],costs=[],editing=null;
+const ctl=new LoboCloudController({url:URL,publishableKey:KEY,getAccessToken:async()=>session?.access_token,getUserId:async()=>session?.user_id});
+const money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+for(const [id,label] of totals){const l=document.createElement('label');l.textContent=label;const i=document.createElement('input');i.id='t-'+id;i.type='number';i.min='0';i.step='0.01';i.placeholder='0,00';i.addEventListener('input',preview);l.append(i);$('total-fields').append(l)}
+for(const [id,label] of units){const l=document.createElement('label');l.textContent=label;const i=document.createElement('input');i.id='u-'+id;i.type='number';i.min='0';i.step='0.01';i.placeholder='0,00';i.addEventListener('input',preview);l.append(i);$('unit-fields').append(l)}
+for(const id of ['cutPieces','goodPieces','damagedPieces'])$(id).addEventListener('input',preview);
+function calculate(){
+ const cut=Number($('cutPieces').value),good=Number($('goodPieces').value),damaged=Number($('damagedPieces').value);
+ if(!Number.isInteger(cut)||cut<=0||!Number.isInteger(good)||good<0||!Number.isInteger(damaged)||damaged<0||cut!==good+damaged)throw Error('Peças cortadas devem ser iguais a peças boas + avarias.');
+ const totalCosts={},unitCosts={};let base=0,finish=0;
+ for(const [id] of totals){const n=Number($('t-'+id).value||0);if(!Number.isFinite(n)||n<0)throw Error('Valor total inválido: '+id);totalCosts[id]=n;base+=n}
+ for(const [id] of units){const n=Number($('u-'+id).value||0);if(!Number.isFinite(n)||n<0)throw Error('Valor unitário inválido: '+id);unitCosts[id]=n;const subtotal=n*(goodOnly.has(id)?good:cut);if(goodOnly.has(id))finish+=subtotal;else base+=subtotal}
+ const total=base+finish;return {cutPieces:cut,goodPieces:good,damagedPieces:damaged,totalCosts,unitCosts,baseSubtotal:base,finishingSubtotal:finish,totalCost:total,unitGoodCost:good>0?total/good:null};
+}
+function preview(){try{const c=calculate();$('preview').textContent='Custo até acabamento: '+money(c.baseSubtotal)+' | Acabamento: '+money(c.finishingSubtotal)+' | Total: '+money(c.totalCost)+' | Custo por peça boa: '+(c.unitGoodCost===null?'—':money(c.unitGoodCost))}catch(e){$('preview').textContent=e.message}}
+async function reload(){
+ $('status').textContent='Consultando banco...';[lots,costs]=await Promise.all([ctl.list('production_lots'),ctl.list('lot_costs')]);
+ const old=$('lot').value;$('lot').replaceChildren(...lots.map(l=>{const o=document.createElement('option');o.value=l.id;o.textContent=(l.brand||'Marca')+' — '+(l.model||l.modelo||l.id);return o}));if(lots.some(l=>l.id===old))$('lot').value=old;
+ $('rows').replaceChildren(...costs.map(c=>{
+  const tr=document.createElement('tr'),lot=lots.find(l=>l.id===c.id);
+  for(const value of [lot?.brand||c.id,c.goodPieces??'—',c.damagedPieces??'—',money(c.totalCost),c.unitGoodCost===null?'—':money(c.unitGoodCost)]){const td=document.createElement('td');td.textContent=String(value);tr.append(td)}
+  const td=document.createElement('td'),btn=document.createElement('button');btn.type='button';btn.textContent='Editar';btn.onclick=()=>{
+   editing=c;$('lot').value=c.id;$('cutPieces').value=c.cutPieces??'';$('goodPieces').value=c.goodPieces??'';$('damagedPieces').value=c.damagedPieces??'';
+   for(const [id] of totals)$('t-'+id).value=c.totalCosts?.[id]??'';for(const [id] of units)$('u-'+id).value=c.unitCosts?.[id]??'';preview();window.scrollTo(0,0)
+  };td.append(btn);tr.append(td);return tr;
+ }));
+ $('status').textContent=costs.length+' composição(ões) de custos carregada(s) do Supabase.';
+}
+$('login').onsubmit=async e=>{
+ e.preventDefault();$('enter').disabled=true;$('status').textContent='Autenticando...';
+ try{
+  const r=await fetch(URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})});
+  const d=await r.json();if(!r.ok||!d.access_token)throw Error(d.msg||d.message||'Login inválido');
+  session={access_token:d.access_token,user_id:d.user.id};$('password').value='';
+  const p=await fetch(URL+'/rest/v1/profiles?select=active,role&user_id=eq.'+encodeURIComponent(d.user.id),{headers:{apikey:KEY,Authorization:'Bearer '+session.access_token}});
+  if(!p.ok)throw Error('Não foi possível verificar perfil');const profiles=await p.json();
+  if(profiles.length!==1||profiles[0].active!==true||profiles[0].role!=='admin')throw Error('Perfil sem autorização.');
+  await reload();$('identity').textContent='Conectado: '+d.user.email;$('auth').hidden=true;$('app').hidden=false;
+ }catch(e){session=null;$('status').textContent=e.message}finally{$('enter').disabled=false}
+};
+$('cost-form').onsubmit=async e=>{
+ e.preventDefault();$('save').disabled=true;$('status').textContent='Gravando custos no Supabase...';
+ try{
+  const id=$('lot').value;if(!lots.some(l=>l.id===id))throw Error('Selecione um lote válido.');
+  const fields=calculate();const previous=costs.find(c=>c.id===id);
+  if(editing&&editing.id!==id)throw Error('Não é permitido trocar o lote durante a edição.');
+  if(!editing&&previous)throw Error('Este lote já tem composição cadastrada. Utilize Editar.');
+  const record=editing?{...editing,...fields}:{id,...fields};
+  await ctl.save('lot_costs',record);editing=null;$('cost-form').reset();preview();await reload();$('status').textContent='Custos confirmados no Supabase.';
+ }catch(e){$('status').textContent='Não foi salvo: '+e.message}finally{$('save').disabled=false}
+};
+$('cancel').onclick=()=>{editing=null;$('cost-form').reset();preview()};
+$('reload').onclick=()=>reload().catch(e=>$('status').textContent=e.message);
+$('logout').onclick=()=>{session=null;editing=null;lots=[];costs=[];$('app').hidden=true;$('auth').hidden=false;$('status').textContent='Sessão encerrada.'};
+</script></body></html>
