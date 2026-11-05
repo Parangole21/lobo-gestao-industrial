@@ -1,0 +1,42 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lobo Industrial — Compras na nuvem</title><style>
+body{margin:0;background:#f5f7fa;color:#152b45;font:15px system-ui,Arial}main{max-width:960px;margin:30px auto;padding:24px;background:white;border-radius:12px;box-shadow:0 2px 18px #0001}h1{font-size:24px}label{display:block;margin:12px 0 5px;font-weight:600}input,select,button{padding:10px;font:inherit;border:1px solid #bbc5d0;border-radius:7px}input{width:100%;box-sizing:border-box}button{cursor:pointer;background:#173d60;color:white;margin:12px 8px 0 0}button:disabled{opacity:.55}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}.muted{color:#586b7b}#status{white-space:pre-wrap}section[hidden]{display:none}</style></head><body><main><h1>Lobo Industrial — Compras de malha</h1><p class="muted">Versão experimental isolada. Cadastro, consulta e edição diretamente no Supabase, sem importar dados do navegador. Não utilize para lançamentos reais antes da validação.</p>
+<section id="auth"><form id="login"><label>E-mail<input id="email" type="email" autocomplete="username" required></label><label>Senha<input id="password" type="password" autocomplete="current-password" required></label><button id="enter">Entrar</button></form></section>
+<section id="app" hidden><p id="identity"></p><form id="purchase"><div class="grid"><label>Número da compra<input id="number" required></label><label>Fabricante<input id="fabricBrand" required></label><label>Quantidade em kg<input id="kg" type="number" min="0.001" step="0.001" required></label><label>Nota fiscal<input id="invoice"></label><label>Valor do pedido (R$)<input id="orderValue" type="number" min="0" step="0.01"></label></div><button id="save">Salvar no banco</button><button type="button" id="cancel">Cancelar edição</button></form><button id="reload">Atualizar lista da nuvem</button><button id="logout">Sair</button><table><thead><tr><th>Compra</th><th>Fabricante</th><th>Kg</th><th>Nota</th><th>Ação</th></tr></thead><tbody id="rows"></tbody></table></section><p id="status" role="status"></p></main>
+<script type="module">
+import { LoboCloudController } from './src/cloud-controller.js';
+const URL='https://yldgebyfflbacicsfseh.supabase.co',KEY='sb_publishable_5GCZ1S_XsQXLfmJbn94WmA_hINR9q38';
+const $=id=>document.getElementById(id);let session=null,editing=null,records=[];
+const controller=new LoboCloudController({url:URL,publishableKey:KEY,getAccessToken:async()=>session?.access_token,getUserId:async()=>session?.user_id});
+async function authRequest(path,body){
+ const r=await fetch(URL+path,{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.msg||d.message||'Falha no login');return d;
+}
+async function reload(){
+ $('status').textContent='Consultando banco...';records=await controller.list('fabric_purchases');$('rows').replaceChildren(...records.map(p=>{
+ const tr=document.createElement('tr');for(const value of [p.number||'',p.fabricBrand||'',String(p.kg??''),p.invoice||'']){const td=document.createElement('td');td.textContent=value;tr.append(td)}
+ const td=document.createElement('td'),btn=document.createElement('button');btn.textContent='Editar';btn.type='button';btn.onclick=()=>{editing=p;for(const key of ['number','fabricBrand','kg','invoice','orderValue'])$(key).value=p[key]??'';window.scrollTo(0,0)};td.append(btn);tr.append(td);return tr;
+ }));$('status').textContent=records.length+' compra(s) carregada(s) do Supabase.';
+}
+$('login').onsubmit=async e=>{
+ e.preventDefault();$('enter').disabled=true;$('status').textContent='Validando acesso...';
+ try{
+  const data=await authRequest('/auth/v1/token?grant_type=password',{email:$('email').value.trim(),password:$('password').value});
+  session={access_token:data.access_token,user_id:data.user.id};$('password').value='';
+  const response=await fetch(URL+'/rest/v1/profiles?select=active,role&user_id=eq.'+encodeURIComponent(data.user.id),{headers:{apikey:KEY,Authorization:'Bearer '+session.access_token}});
+  if(!response.ok)throw Error('Não foi possível verificar o perfil.');
+  const profiles=await response.json();if(profiles.length!==1||profiles[0].active!==true||profiles[0].role!=='admin')throw Error('Perfil sem autorização.');
+  await reload();$('identity').textContent='Conectado: '+data.user.email;$('auth').hidden=true;$('app').hidden=false;
+ }catch(err){session=null;$('status').textContent=err.message}finally{$('enter').disabled=false}
+};
+$('purchase').onsubmit=async e=>{
+ e.preventDefault();$('save').disabled=true;$('status').textContent='Salvando no Supabase...';
+ try{
+  const fields={number:$('number').value.trim(),fabricBrand:$('fabricBrand').value.trim(),kg:Number($('kg').value),invoice:$('invoice').value.trim(),orderValue:$('orderValue').value===''?null:Number($('orderValue').value)};
+  if(!fields.number||!fields.fabricBrand||!Number.isFinite(fields.kg)||fields.kg<=0)throw Error('Informe número, fabricante e quantidade válida.');
+  const record=editing?{...editing,...fields}:{id:crypto.randomUUID(),...fields};
+  await controller.save('fabric_purchases',record);editing=null;$('purchase').reset();await reload();$('status').textContent='Compra confirmada no Supabase.';
+ }catch(err){$('status').textContent='Não foi salvo: '+err.message}finally{$('save').disabled=false}
+};
+$('cancel').onclick=()=>{editing=null;$('purchase').reset()};$('reload').onclick=()=>reload().catch(e=>$('status').textContent=e.message);
+$('logout').onclick=()=>{session=null;editing=null;records=[];$('app').hidden=true;$('auth').hidden=false;$('status').textContent='Sessão local encerrada.'};
+</script></body></html>
