@@ -10,6 +10,7 @@ body{font:15px system-ui,Arial;background:#f5f7fa;color:#172b42;margin:0}main{ma
 <button id="reload" type="button">Atualizar tudo do banco</button><button id="logout" type="button">Sair</button></section><p id="status" role="status"></p></main>
 <script type="module">
 import { LoboCloudController } from './src/cloud-controller.js';
+import { readSession, saveSession, clearSession, verifyAdminSession } from './src/auth-session.js';
 const URL='https://yldgebyfflbacicsfseh.supabase.co',KEY='sb_publishable_5GCZ1S_XsQXLfmJbn94WmA_hINR9q38',$=id=>document.getElementById(id);
 let session=null,editing=null,cloud={};
 const controller=new LoboCloudController({url:URL,publishableKey:KEY,getAccessToken:async()=>session?.access_token,getUserId:async()=>session?.user_id});
@@ -35,12 +36,10 @@ $('login').onsubmit=async e=>{
  try{
   const response=await fetch(URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})});
   const d=await response.json();if(!response.ok||!d.access_token)throw Error(d.msg||d.message||'Login inválido');
-  session={access_token:d.access_token,user_id:d.user.id};$('password').value='';
-  const p=await fetch(URL+'/rest/v1/profiles?select=active,role&user_id=eq.'+encodeURIComponent(d.user.id),{headers:{apikey:KEY,Authorization:'Bearer '+session.access_token}});
-  if(!p.ok)throw Error('Falha ao verificar permissões');const profiles=await p.json();
-  if(profiles.length!==1||profiles[0].active!==true||profiles[0].role!=='admin')throw Error('Usuário sem permissão ativa');
+  session=saveSession(d);$('password').value='';
+  await verifyAdminSession(URL,KEY,session);
   await reload();$('identity').textContent='Conectado: '+d.user.email;$('auth').hidden=true;$('app').hidden=false;
- }catch(err){session=null;$('status').textContent=err.message}finally{$('enter').disabled=false}
+ }catch(err){session=null;clearSession();$('status').textContent=err.message}finally{$('enter').disabled=false}
 };
 $('lot-form').onsubmit=async e=>{
  e.preventDefault();$('save').disabled=true;$('status').textContent='Gravando lote no Supabase...';
@@ -56,5 +55,20 @@ $('lot-form').onsubmit=async e=>{
 };
 $('cancel').onclick=()=>{editing=null;$('lot-form').reset()};
 $('reload').onclick=()=>reload().catch(e=>$('status').textContent=e.message);
-$('logout').onclick=()=>{session=null;editing=null;cloud={};$('app').hidden=true;$('auth').hidden=false;$('status').textContent='Sessão encerrada.'};
+$('logout').onclick=()=>{clearSession();session=null;editing=null;cloud={};$('app').hidden=true;$('auth').hidden=false;$('status').textContent='Sessão encerrada.'};
+
+async function restoreSession(){
+ const previous=readSession();if(!previous)return;
+ session=previous;$('status').textContent='Restaurando acesso...';
+ try{
+  await verifyAdminSession(URL,KEY,session);
+  await reload();
+  $('identity').textContent='Conectado: '+(session.email||'Administrador');
+  $('auth').hidden=true;$('app').hidden=false;
+ }catch(err){
+  clearSession();session=null;$('auth').hidden=false;$('app').hidden=true;
+  $('status').textContent='Entre novamente: '+err.message;
+ }
+}
+restoreSession();
 </script></body></html>
