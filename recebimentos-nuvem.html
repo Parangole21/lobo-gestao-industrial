@@ -5,6 +5,7 @@ body{margin:0;background:#f5f7fa;color:#152b45;font:15px system-ui,Arial}main{ma
 <section id="app" hidden><p id="identity"></p><form id="receipt"><div class="grid"><label>Compra de origem<select id="purchase" required></select></label><label>Data de recebimento<input id="date" type="date" required></label><label>Malha recebida (kg)<input id="malhakg" type="number" min="0.001" step="0.001" required></label><label>Nota fiscal<input id="invoice"></label><label>Observação<input id="notes"></label></div><button id="save">Salvar no banco</button><button id="cancel" type="button">Cancelar edição</button></form><button id="reload">Atualizar do Supabase</button><button id="logout">Sair</button><table><thead><tr><th>Compra</th><th>Data</th><th>Malha (kg)</th><th>NF</th><th>Ação</th></tr></thead><tbody id="rows"></tbody></table></section><p id="status" role="status"></p></main>
 <script type="module">
 import { LoboCloudController } from './src/cloud-controller.js';
+import { readSession, saveSession, clearSession, verifyAdminSession } from './src/auth-session.js';
 const URL='https://yldgebyfflbacicsfseh.supabase.co',KEY='sb_publishable_5GCZ1S_XsQXLfmJbn94WmA_hINR9q38';
 const $=id=>document.getElementById(id);let session=null,editing=null,receipts=[],purchases=[];
 const controller=new LoboCloudController({url:URL,publishableKey:KEY,getAccessToken:async()=>session?.access_token,getUserId:async()=>session?.user_id});
@@ -31,12 +32,10 @@ $('login').onsubmit=async e=>{
  e.preventDefault();$('enter').disabled=true;$('status').textContent='Validando acesso...';
  try{
   const d=await authRequest('/auth/v1/token?grant_type=password',{email:$('email').value.trim(),password:$('password').value});
-  session={access_token:d.access_token,user_id:d.user.id};$('password').value='';
-  const response=await fetch(URL+'/rest/v1/profiles?select=active,role&user_id=eq.'+encodeURIComponent(d.user.id),{headers:{apikey:KEY,Authorization:'Bearer '+session.access_token}});
-  if(!response.ok)throw Error('Não foi possível verificar o perfil.');
-  const profiles=await response.json();if(profiles.length!==1||profiles[0].active!==true||profiles[0].role!=='admin')throw Error('Perfil sem autorização.');
+  session=saveSession(d);$('password').value='';
+  await verifyAdminSession(URL,KEY,session);
   await reload();$('identity').textContent='Conectado: '+d.user.email;$('auth').hidden=true;$('app').hidden=false;
- }catch(err){session=null;$('status').textContent=err.message}finally{$('enter').disabled=false}
+ }catch(err){session=null;clearSession();$('status').textContent=err.message}finally{$('enter').disabled=false}
 };
 $('receipt').onsubmit=async e=>{
  e.preventDefault();$('save').disabled=true;$('status').textContent='Salvando no banco...';
@@ -53,5 +52,20 @@ $('receipt').onsubmit=async e=>{
 };
 $('cancel').onclick=()=>{editing=null;$('receipt').reset()};
 $('reload').onclick=()=>reload().catch(e=>$('status').textContent=e.message);
-$('logout').onclick=()=>{session=null;editing=null;receipts=[];purchases=[];$('app').hidden=true;$('auth').hidden=false;$('status').textContent='Sessão local encerrada.'};
+$('logout').onclick=()=>{clearSession();session=null;editing=null;receipts=[];purchases=[];$('app').hidden=true;$('auth').hidden=false;$('status').textContent='Sessão local encerrada.'};
+
+async function restoreSession(){
+ const previous=readSession();if(!previous)return;
+ session=previous;$('status').textContent='Restaurando acesso...';
+ try{
+  await verifyAdminSession(URL,KEY,session);
+  await reload();
+  $('identity').textContent='Conectado: '+(session.email||'Administrador');
+  $('auth').hidden=true;$('app').hidden=false;
+ }catch(err){
+  clearSession();session=null;$('auth').hidden=false;$('app').hidden=true;
+  $('status').textContent='Entre novamente: '+err.message;
+ }
+}
+restoreSession();
 </script></body></html>
