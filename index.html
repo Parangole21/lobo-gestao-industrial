@@ -2,6 +2,31 @@
 const SUPABASE_PROJECT_URL='https://yldgebyfflbacicsfseh.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_5GCZ1S_XsQXLfmJbn94WmA_hINR9q38';
 let cloudSession=null;
+const ORIGINAL_SESSION_KEY='lobo-industrial-main-auth-v1';
+function saveOriginalSession(){
+ if(cloudSession?.access_token&&cloudSession?.refresh_token){
+  sessionStorage.setItem(ORIGINAL_SESSION_KEY,JSON.stringify(cloudSession));
+ }
+}
+function clearOriginalSession(){sessionStorage.removeItem(ORIGINAL_SESSION_KEY)}
+async function restoreOriginalSession(){
+ let stored=null;
+ try{stored=JSON.parse(sessionStorage.getItem(ORIGINAL_SESSION_KEY)||'null')}catch(e){clearOriginalSession()}
+ if(!stored?.access_token||!stored?.refresh_token||!stored?.user_id)return;
+ cloudSession=stored;
+ try{
+  await ensureCloudSession();
+  const response=await fetch(SUPABASE_PROJECT_URL+'/rest/v1/profiles?select=user_id,full_name,role,active&user_id=eq.'+encodeURIComponent(cloudSession.user_id),{headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token},cache:'no-store'});
+  if(!response.ok)throw Error('Perfil não pôde ser verificado.');
+  const profiles=await response.json(),profile=profiles[0];
+  if(profiles.length!==1||profile.active!==true||profile.role!=='admin')throw Error('Perfil não autorizado.');
+  saveOriginalSession();
+  cloudAuthStatus('Conectado: '+(profile.full_name||'Administrador'));
+  closeCloudLogin();
+ }catch(err){
+  cloudSession=null;clearOriginalSession();cloudAuthStatus('Entre novamente');openCloudLogin();
+ }
+}
 let lastPendingPurchaseId=null;
 let cloudRefreshPending=null;
 async function ensureCloudSession(){
@@ -13,9 +38,9 @@ async function ensureCloudSession(){
   const response=await fetch(SUPABASE_PROJECT_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:cloudSession.refresh_token}),cache:'no-store'});
   const data=await response.json();
   if(!response.ok||!data.access_token){const error=new Error('Não foi possível renovar sua sessão.');error.invalidSession=response.status===400||response.status===401;throw error;}
-  cloudSession={...cloudSession,access_token:data.access_token,refresh_token:data.refresh_token||cloudSession.refresh_token,expires_at:Date.now()+Number(data.expires_in||3600)*1000};
+  cloudSession={...cloudSession,access_token:data.access_token,refresh_token:data.refresh_token||cloudSession.refresh_token,expires_at:Date.now()+Number(data.expires_in||3600)*1000};saveOriginalSession();
  })();
- try{await cloudRefreshPending}catch(err){if(err.invalidSession){cloudSession=null;cloudAuthStatus('Sessão encerrada');openCloudLogin()}throw err}finally{cloudRefreshPending=null}
+ try{await cloudRefreshPending}catch(err){if(err.invalidSession){cloudSession=null;clearOriginalSession();cloudAuthStatus('Sessão encerrada');openCloudLogin()}throw err}finally{cloudRefreshPending=null}
 }
 
 function openCloudLogin(){document.body.classList.add('auth-locked');const m=document.getElementById('cloud-login-modal');m.style.display='flex';document.getElementById('cloud-login-message').textContent='';document.getElementById('cloud-email').focus();}
@@ -39,7 +64,7 @@ refreshCloudSyncAlert();
 function cloudAuthStatus(message){document.getElementById('cloud-auth-status').textContent=message;document.getElementById('cloud-logout').style.display=cloudSession?'inline-block':'none';document.getElementById('cloud-sync-controls').style.display=cloudSession?'block':'none';}
 async function cloudLogout(){
  if(cloudSyncInProgress||cloudLotsBusy||cloudCutsBusy||cloudCostsBusy){alert('Há uma sincronização em andamento. Tente sair novamente quando terminar.');return}
- const token=cloudSession?.access_token;cloudSession=null;cloudAuthStatus('Não autenticado');openCloudLogin();
+ const token=cloudSession?.access_token;cloudSession=null;clearOriginalSession();cloudAuthStatus('Não autenticado');openCloudLogin();
  if(token){try{await fetch(SUPABASE_PROJECT_URL+'/auth/v1/logout',{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+token}});}catch(e){}}
 }
 document.getElementById('cloud-login-form').addEventListener('submit',async function(e){
@@ -51,8 +76,8 @@ document.getElementById('cloud-login-form').addEventListener('submit',async func
   const profileResponse=await fetch(SUPABASE_PROJECT_URL+'/rest/v1/profiles?select=user_id,full_name,role,active&user_id=eq.'+encodeURIComponent(data.user.id),{headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+data.access_token,Accept:'application/json'}});
   if(!profileResponse.ok){msg.textContent='Login válido, mas sem permissão para consultar o perfil (HTTP '+profileResponse.status+'). Confira as políticas RLS da tabela profiles.';return;}
   const profiles=await profileResponse.json();const profile=Array.isArray(profiles)?profiles[0]:null;
-  if(!profile||profile.active!==true){msg.textContent='Login válido, mas o perfil não está ativo ou não foi encontrado.';return;}
-  cloudSession={access_token:data.access_token,refresh_token:data.refresh_token||null,expires_at:Date.now()+Number(data.expires_in||3600)*1000,user_id:data.user.id,role:profile.role};
+  if(!profile||profile.active!==true||profile.role!=='admin'){msg.textContent='Login válido, mas o perfil não está ativo ou não foi encontrado.';return;}
+  cloudSession={access_token:data.access_token,refresh_token:data.refresh_token||null,expires_at:Date.now()+Number(data.expires_in||3600)*1000,user_id:data.user.id,role:profile.role};saveOriginalSession();
   cloudAuthStatus('Conectado: '+(profile.full_name||data.user.email));
   closeCloudLogin();
   setTimeout(()=>{cloudSyncMaterials(true);cloudSyncLots(true);setTimeout(()=>{cloudSyncCuts(true);cloudSyncCosts(true)},2200)},1200);
@@ -847,6 +872,7 @@ $('ind-cost-rows').innerHTML=selected.map(l=>{const d=costData[l.id],has=d&&(d.h
 const cutKg=cuts.reduce((a,c)=>a+Number(c.kg||0),0),cutQty=cuts.reduce((a,c)=>a+Number(c.pieces||0),0),allocated=lots.reduce((a,l)=>a+Number(l.quantity||0),0);$('ind-cut-summary').innerHTML=[['Kg cortados',num(cutKg)+' kg'],['Peças cortadas',num(cutQty)],['Rendimento geral',cutKg?(cutQty/cutKg).toFixed(2).replace('.',',')+' peças/kg':'—'],['Peças destinadas a marcas',num(allocated)],['Peças disponíveis para destinação',num(cutQty-allocated)]].map(([label,value])=>'<div class="stat"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join('');$('ind-cut-rows').innerHTML=parents.map(p=>{const cs=cuts.filter(c=>c.parentId===p.id),kg=cs.reduce((a,c)=>a+Number(c.kg||0),0),qty=cs.reduce((a,c)=>a+Number(c.pieces||0),0),used=lots.filter(l=>l.parentId===p.id).reduce((a,l)=>a+Number(l.quantity||0),0);return '<tr><td>'+esc(p.number||'Compra')+' · '+esc(p.fabricBrand||'Malha')+'</td><td>'+num(kg)+'</td><td>'+num(qty)+'</td><td>'+(kg?(qty/kg).toFixed(2).replace('.',','):'—')+'</td><td>'+num(used)+'</td><td>'+num(qty-used)+'</td></tr>'}).join('')||'<tr><td colspan="6">Nenhuma compra cadastrada.</td></tr>'}
 $('ind-brand').onchange=renderIndicators;$('ind-from').onchange=renderIndicators;$('ind-to').onchange=renderIndicators;$('ind-clear').onclick=()=>{$('ind-brand').value='';$('ind-from').value='';$('ind-to').value='';renderIndicators()};
 
+restoreOriginalSession();
 clearCut();
 receiptChoices();resetParent();resetChild(true);renderLots();$('page-materia').style.display='block';$('page-lotes').style.display='none';$('lot-sidebar').style.display='none';
 </script></body></html>
