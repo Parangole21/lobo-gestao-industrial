@@ -21,7 +21,19 @@ async function reload(){
   for(const v of [purchase?.number||c.parentId||'—',kg,pieces,kg>0?(pieces/kg).toFixed(2):'—']){const td=document.createElement('td');td.textContent=String(v);tr.append(td)}
   const td=document.createElement('td'),btn=document.createElement('button');btn.type='button';btn.textContent='Editar';btn.onclick=()=>{
    editing=c;$('purchase').value=c.parentId||c.purchaseId||c.purchase_id||'';$('kg').value=kg;$('pieces').value=pieces;$('date').value=c.date||new Date().toLocaleDateString('en-CA');updateYield();window.scrollTo(0,0)
-  };td.append(btn);tr.append(td);return tr;
+  };td.append(btn);
+ const del=document.createElement('button');del.type='button';del.textContent='Excluir';del.style.background='#80322e';
+ del.onclick=async()=>{
+  if(!confirm('Excluir este registro do Supabase? Esta ação é permanente.'))return;
+  del.disabled=true;
+  try{
+   await ctl.remove('fabric_cuts',c);
+   if(editing?.id===c.id){editing=null;$('cut-form').reset()}
+   await reload();$('status').textContent='Registro excluído do Supabase.';
+  }catch(err){$('status').textContent='Não foi possível excluir: '+err.message}
+  finally{del.disabled=false}
+ };
+ td.append(del);tr.append(td);return tr;
  }));
  $('status').textContent=cuts.length+' corte(s) carregado(s) diretamente do banco.';
 }
