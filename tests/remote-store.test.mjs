@@ -48,6 +48,17 @@ test('conflito de edição não é tratado como sucesso',async()=>{
   }finally{m.restore()}
 });
 
+test('edição avança a versão para prevenir sobrescrita entre computadores',async()=>{
+  const m=mockStore([{status:200,body:[{id:'p1',updated_at:'2026-11-05T13:00:00Z'}]}]);
+  try{
+    const repo=new LoboIndustrialRepository(m.store);
+    await repo.update('fabric_purchases',{id:'p1',number:'MAL-001',_updatedAt:'2026-11-05T12:00:00Z'},'user-1');
+    const patch=JSON.parse(m.calls[0].options.body);
+    assert.ok(Date.parse(patch.updated_at)>Date.parse('2026-11-05T12:00:00Z'));
+    assert.equal(patch.updated_by,'user-1');
+  }finally{m.restore()}
+});
+
 test('exclusão remota só confirma se uma linha foi excluída',async()=>{
   const m=mockStore([{status:200,body:[{id:'p1'}]}]);
   try{
