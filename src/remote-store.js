@@ -43,6 +43,7 @@ export class LoboRemoteStore {
     return result[0];
   }
   async update(table,id,updatedAt,patch) {
+    if(table==='lot_movements') throw new Error('Movimentações são eventos: não é permitida edição por este método.');
     if(!updatedAt)throw new Error('Versão anterior obrigatória para edição segura.');
     const q='?'+this.key(table)+'=eq.'+encodeURIComponent(id)+'&updated_at=eq.'+encodeURIComponent(updatedAt);
     const result=await this.request(table,'PATCH',q,patch);
@@ -50,6 +51,7 @@ export class LoboRemoteStore {
     return result[0];
   }
   async remove(table,id,updatedAt) {
+    if(table==='lot_movements') throw new Error('Movimentações exigem política de exclusão própria.');
     if(!updatedAt)throw new Error('Versão anterior obrigatória para exclusão segura.');
     const q='?'+this.key(table)+'=eq.'+encodeURIComponent(id)+'&updated_at=eq.'+encodeURIComponent(updatedAt);
     const result=await this.request(table,'DELETE',q);
