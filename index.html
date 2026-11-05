@@ -2,6 +2,7 @@
 const SUPABASE_PROJECT_URL='https://yldgebyfflbacicsfseh.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_5GCZ1S_XsQXLfmJbn94WmA_hINR9q38';
 let cloudSession=null;
+let lastPendingPurchaseId=null;
 let cloudRefreshPending=null;
 async function ensureCloudSession(){
  if(!cloudSession?.access_token)throw Error('Faça login para sincronizar.');
@@ -11,10 +12,10 @@ async function ensureCloudSession(){
   if(!cloudSession?.refresh_token)throw Error('A sessão expirou e não pode ser renovada.');
   const response=await fetch(SUPABASE_PROJECT_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:cloudSession.refresh_token}),cache:'no-store'});
   const data=await response.json();
-  if(!response.ok||!data.access_token)throw Error('Não foi possível renovar sua sessão.');
+  if(!response.ok||!data.access_token){const error=new Error('Não foi possível renovar sua sessão.');error.invalidSession=response.status===400||response.status===401;throw error;}
   cloudSession={...cloudSession,access_token:data.access_token,refresh_token:data.refresh_token||cloudSession.refresh_token,expires_at:Date.now()+Number(data.expires_in||3600)*1000};
  })();
- try{await cloudRefreshPending}catch(err){cloudSession=null;cloudAuthStatus('Sessão encerrada');openCloudLogin();throw err}finally{cloudRefreshPending=null}
+ try{await cloudRefreshPending}catch(err){if(err.invalidSession){cloudSession=null;cloudAuthStatus('Sessão encerrada');openCloudLogin()}throw err}finally{cloudRefreshPending=null}
 }
 
 function openCloudLogin(){document.body.classList.add('auth-locked');const m=document.getElementById('cloud-login-modal');m.style.display='flex';document.getElementById('cloud-login-message').textContent='';document.getElementById('cloud-email').focus();}
@@ -171,6 +172,15 @@ async function cloudSyncMaterials(automatic=false){
   if(!Array.isArray(remotePurchases)||!Array.isArray(remoteReceipts))throw Error('Resposta inesperada do banco.');
   syncStage='comparando dados locais';
   const localPurchases=parents.filter(p=>p&&!p.receiptId&&!String(p.id).startsWith('receipt-'));
+  // Detectar números repetidos em IDs distintos antes de enviar novos registros.
+  const allPurchaseNumbers=new Map();
+  for(const p of [...remotePurchases.map(x=>x.data).filter(Boolean),...localPurchases]){
+   const number=String(p.number||'').trim().toUpperCase(),id=String(p.id||'');
+   if(!number||!id)continue;
+   if(allPurchaseNumbers.has(number)&&allPurchaseNumbers.get(number)!==id)
+    throw Error('Numeração duplicada: '+number+'. Existem duas compras diferentes com esse número. Nenhuma alteração foi enviada. Solicite correção antes de prosseguir.');
+   allPurchaseNumbers.set(number,id);
+  }
   const remotePurchaseIds=new Set(remotePurchases.map(x=>String(x.id)));
   const remoteReceiptIds=new Set(remoteReceipts.map(x=>String(x.id)));
   let tomb={};try{tomb=JSON.parse(localStorage.getItem('lobo-exclusoes-confirmadas-v79')||'{}')||{}}catch(e){}
@@ -269,6 +279,12 @@ async function cloudSyncMaterials(automatic=false){
   for(const item of [...mergedParents.filter(x=>!x.receiptId&&!String(x.id).startsWith('receipt-'))])next.purchases[String(item.id)]=cloudLotJson(item);
   for(const item of mergedRecords)next.receipts[String(item.id)]=cloudLotJson(item);
   localStorage.setItem(CLOUD_MATERIALS_BASE_KEY,JSON.stringify(next));
+  if(lastPendingPurchaseId&&next.purchases[String(lastPendingPurchaseId)]){
+   const lot=parents.find(p=>String(p.id)===String(lastPendingPurchaseId));
+   const confirmation=document.getElementById('lot-save-message');
+   if(lot&&confirmation){confirmation.innerHTML='✓ Lote <strong>'+esc(lot.number)+'</strong> sincronizado com a nuvem. <button type="button" class="btn secondary" style="margin-left:10px" onclick="showLotView(\'consulta\')">Consultar lote salvo</button>';confirmation.style.display='block'}
+   lastPendingPurchaseId=null;
+  }
   msg.textContent='Concluído: '+newPurchases.length+' compra(s) e '+newReceipts.length+' recebimento(s) enviados; '+updates.length+' atualizados; '+purchaseAdditions.length+' compra(s) e '+receiptAdditions.length+' recebimento(s) novos recebidos; '+(downloads.purchases.length+downloads.receipts.length)+' atualização(ões) recebida(s). Dados preservados.';
  }catch(e){console.error('Sincronização de materiais — '+syncStage,e);msg.textContent='Falha em '+syncStage+': '+(e.message||e)+'. Dados locais preservados.';}
  finally{btn.disabled=false;cloudSyncInProgress=false}
@@ -669,7 +685,7 @@ async function cloudSyncCosts(automatic=false){
 }
 function resetParent(){editingParent=null;HTMLFormElement.prototype.reset.call($('parent-form'));$('parent-number').value=nextParentNumber();$('parent-title').textContent='Novo lote principal de malha';$('parent-save').textContent='Salvar lote principal'}
 $('parent-reset').onclick=resetParent;
-$('parent-form').onsubmit=e=>{e.preventDefault();const kg=toNum($('parent-kg-input').value);if(kg<=0){alert('Informe a quantidade de malha em kg.');return}const old=parents.find(p=>p.id===editingParent);const p={id:old?.id||uid(),number:old?.number||nextParentNumber(),kg,fabricBrand:$('parent-fabric-brand').value.trim(),invoice:$('parent-invoice').value.trim(),orderValue:$('parent-order-value').value===''?null:toNum($('parent-order-value').value),ordered:$('parent-ordered').value,billed:$('parent-billed').value,expected:$('parent-expected').value,delivered:$('parent-delivered').value,orderedDone:$('parent-ordered-done').checked,billedDone:$('parent-billed-done').checked,expectedDone:$('parent-expected-done').checked,deliveredDone:$('parent-delivered-done').checked,notes:$('parent-notes').value.trim()};if(old)parents=parents.map(x=>x.id===p.id?p:x);else parents.push(p);try{localStorage.setItem(PARENT_KEY,JSON.stringify(parents));localStorage.setItem(LOT_KEY,JSON.stringify(lots));const verified=JSON.parse(localStorage.getItem(PARENT_KEY)||'[]');if(!verified.some(x=>x.id===p.id))throw Error('O lote não foi encontrado após a gravação');parents=verified}catch(err){alert('Falha ao salvar o lote: '+err.message);return}resetParent();receiptChoices();showLotView('cadastro');$('lot-save-message').innerHTML='✓ Lote <strong>'+esc(p.number)+'</strong> gravado e verificado no navegador. <button type="button" class="btn secondary" style="margin-left:10px" onclick="showLotView(\'consulta\')">Consultar lote salvo</button>';$('lot-save-message').style.display='block';try{renderLots()}catch(err){console.error('Falha ao atualizar a lista:',err)}};
+$('parent-form').onsubmit=e=>{e.preventDefault();const kg=toNum($('parent-kg-input').value);if(kg<=0){alert('Informe a quantidade de malha em kg.');return}const old=parents.find(p=>p.id===editingParent);const p={id:old?.id||uid(),number:old?.number||nextParentNumber(),kg,fabricBrand:$('parent-fabric-brand').value.trim(),invoice:$('parent-invoice').value.trim(),orderValue:$('parent-order-value').value===''?null:toNum($('parent-order-value').value),ordered:$('parent-ordered').value,billed:$('parent-billed').value,expected:$('parent-expected').value,delivered:$('parent-delivered').value,orderedDone:$('parent-ordered-done').checked,billedDone:$('parent-billed-done').checked,expectedDone:$('parent-expected-done').checked,deliveredDone:$('parent-delivered-done').checked,notes:$('parent-notes').value.trim()};if(old)parents=parents.map(x=>x.id===p.id?p:x);else parents.push(p);try{localStorage.setItem(PARENT_KEY,JSON.stringify(parents));localStorage.setItem(LOT_KEY,JSON.stringify(lots));const verified=JSON.parse(localStorage.getItem(PARENT_KEY)||'[]');if(!verified.some(x=>x.id===p.id))throw Error('O lote não foi encontrado após a gravação');parents=verified}catch(err){alert('Falha ao salvar o lote: '+err.message);return}lastPendingPurchaseId=String(p.id);resetParent();receiptChoices();showLotView('cadastro');$('lot-save-message').innerHTML='◷ Lote <strong>'+esc(p.number)+'</strong> salvo neste computador. Aguardando confirmação da nuvem. <button type="button" class="btn secondary" style="margin-left:10px" onclick="showLotView(\'consulta\')">Consultar lote salvo</button>';$('lot-save-message').style.display='block';try{renderLots()}catch(err){console.error('Falha ao atualizar a lista:',err)}};
 function selectParent(id){activeParent=id;editingChild=null;resetChild(false);showLotView('marca');$('child-panel').scrollIntoView({behavior:'smooth',block:'start'})}
 const CHILD_STAGES=['Corte','Costura','Serigrafia','Bordado','Casa','Botão','Limpeza','Embalagem','Estoque','Entregue'];
 function historyDuration(ms){if(!Number.isFinite(ms)||ms<0)return 'Não calculável';const days=Math.floor(ms/86400000),hours=Math.floor(ms%86400000/3600000),minutes=Math.floor(ms%3600000/60000);return days?days+' dia(s) e '+hours+' h':hours?hours+' h e '+minutes+' min':minutes+' min'}
