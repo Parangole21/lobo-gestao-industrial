@@ -6,7 +6,7 @@ function openCloudLogin(){document.body.classList.add('auth-locked');const m=doc
 function closeCloudLogin(){if(!cloudSession)return;document.getElementById('cloud-login-modal').style.display='none';document.getElementById('cloud-password').value='';document.body.classList.remove('auth-locked');}
 // Oculta o relatório normal de sincronização; problemas continuam visíveis.
 const cloudSyncMessageElement=document.getElementById('cloud-sync-message');
-const cloudSyncFailurePattern=/conflito|divergente|interrompid|pausad|falha|erro|não sincronizad|nao sincronizad|não foi|nao foi|sem permissão|sem permissao|http [45]\\d\\d|inconsistên|orfa|exclusões parciais|exclusoes parciais|alteração simultânea|alteracao simultanea|dados não|dados nao/i;
+const cloudSyncFailurePattern=/conflito|divergente|interrompid|pausad|falha|erro|não sincronizad|nao sincronizad|não foi|nao foi|sem permissão|sem permissao|http [45][0-9][0-9]|inconsistên|orfa|exclusões parciais|exclusoes parciais|alteração simultânea|alteracao simultanea|dados não|dados nao/i;
 function refreshCloudSyncAlert(){
  const info=(cloudSyncMessageElement.textContent||'').trim();
  cloudSyncMessageElement.classList.toggle('sync-attention',!!info&&cloudSyncFailurePattern.test(info));
