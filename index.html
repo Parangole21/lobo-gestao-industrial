@@ -80,7 +80,7 @@ document.getElementById('cloud-login-form').addEventListener('submit',async func
   cloudSession={access_token:data.access_token,refresh_token:data.refresh_token||null,expires_at:Date.now()+Number(data.expires_in||3600)*1000,user_id:data.user.id,role:profile.role};saveOriginalSession();
   cloudAuthStatus('Conectado: '+(profile.full_name||data.user.email));
   closeCloudLogin();
-  setTimeout(()=>{cloudSyncMaterials(true);cloudSyncLots(true);setTimeout(()=>{cloudSyncCuts(true);cloudSyncCosts(true)},2200)},1200);
+  setTimeout(()=>runOriginalSyncCycle(),1200);
  }catch(err){msg.textContent=err.message||'Não foi possível autenticar.';}finally{btn.disabled=false;}
 });
 async function testSupabaseConnection(){
@@ -316,7 +316,29 @@ async function cloudSyncMaterials(automatic=false){
 }
 // Sincronização periódica conservadora: não sobrescreve nem remove registros.
 // As demais áreas continuam locais até a criação das tabelas e políticas específicas.
-setInterval(()=>{const btn=document.getElementById('cloud-sync-btn');if(cloudSession&&!testLotReconciliationBusy&&document.visibilityState==='visible'&&btn?.dataset.syncing!=='1'&&!cloudSyncInProgress&&!cloudLotsBusy&&!cloudCutsBusy&&!cloudCostsBusy){cloudSyncMaterials(true);cloudSyncLots(true);setTimeout(()=>{if(document.getElementById('cloud-sync-btn')?.dataset.syncing!=='1'){cloudSyncCuts(true);cloudSyncCosts(true)}},1500)}},30000);
+let originalSyncCyclePending=null;
+async function runOriginalSyncCycle(){
+ if(originalSyncCyclePending)return originalSyncCyclePending;
+ if(!cloudSession||cloudSyncInProgress||cloudLotsBusy||cloudCutsBusy||cloudCostsBusy)return;
+ originalSyncCyclePending=(async()=>{
+  // Executa em sequência para evitar leituras de lotes antes das compras.
+  await cloudSyncMaterials(true);
+  if(!cloudSession)return;
+  await cloudSyncLots(true);
+  if(!cloudSession)return;
+  await cloudSyncCuts(true);
+  if(!cloudSession)return;
+  await cloudSyncCosts(true);
+ })();
+ try{await originalSyncCyclePending}
+ finally{originalSyncCyclePending=null}
+}
+setInterval(()=>{
+ const btn=document.getElementById('cloud-sync-btn');
+ if(cloudSession&&!testLotReconciliationBusy&&document.visibilityState==='visible'&&btn?.dataset.syncing!=='1'){
+  runOriginalSyncCycle().catch(err=>console.error('Ciclo de sincronização',err));
+ }
+},30000);
 
 window.addEventListener('error',function(e){const box=document.getElementById('system-error');if(box){box.style.display='block';box.textContent='Erro técnico: '+(e.message||'Falha inesperada')+' (linha '+(e.lineno||'?')+')'}});
 const LOT_KEY='lobo-industrial-lotes-v1',PARENT_KEY='lobo-industrial-malha-lotes-v4',CUT_KEY='lobo-industrial-cortes-v1';
