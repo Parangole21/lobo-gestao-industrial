@@ -4,10 +4,10 @@ body{margin:0;background:#f5f7fa;color:#152b45;font:15px system-ui,Arial}main{ma
 <section id="app" hidden><p id="identity"></p><form id="purchase"><div class="grid"><label>Número da compra<input id="number" required></label><label>Fabricante<input id="fabricBrand" required></label><label>Quantidade em kg<input id="kg" type="number" min="0.001" step="0.001" required></label><label>Nota fiscal<input id="invoice"></label><label>Valor do pedido (R$)<input id="orderValue" type="number" min="0" step="0.01"></label></div><button id="save">Salvar no banco</button><button type="button" id="cancel">Cancelar edição</button></form><button id="reload">Atualizar lista da nuvem</button><button id="logout">Sair</button><table><thead><tr><th>Compra</th><th>Fabricante</th><th>Kg</th><th>Nota</th><th>Ação</th></tr></thead><tbody id="rows"></tbody></table></section><p id="status" role="status"></p></main>
 <script type="module">
 import { LoboCloudController } from './src/cloud-controller.js';
-import { readSession, saveSession, clearSession, verifyAdminSession } from './src/auth-session.js';
+import { readSession, saveSession, clearSession, verifyAdminSession, getValidSession } from './src/auth-session.js';
 const URL='https://yldgebyfflbacicsfseh.supabase.co',KEY='sb_publishable_5GCZ1S_XsQXLfmJbn94WmA_hINR9q38';
 const $=id=>document.getElementById(id);let session=null,editing=null,records=[];
-const controller=new LoboCloudController({url:URL,publishableKey:KEY,getAccessToken:async()=>session?.access_token,getUserId:async()=>session?.user_id});
+const controller=new LoboCloudController({url:URL,publishableKey:KEY,getAccessToken:async()=>{session=await getValidSession(URL,KEY);return session?.access_token},getUserId:async()=>session?.user_id});
 async function authRequest(path,body){
  const r=await fetch(URL+path,{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
  const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.msg||d.message||'Falha no login');return d;
@@ -23,6 +23,8 @@ $('login').onsubmit=async e=>{
  try{
   const data=await authRequest('/auth/v1/token?grant_type=password',{email:$('email').value.trim(),password:$('password').value});
   session=saveSession(data);$('password').value='';
+  session=await getValidSession(URL,KEY);
+  if(!session)throw Error('Sessão expirada.');
   await verifyAdminSession(URL,KEY,session);
   await reload();$('identity').textContent='Conectado: '+data.user.email;$('auth').hidden=true;$('app').hidden=false;
  }catch(err){session=null;clearSession();$('status').textContent=err.message}finally{$('enter').disabled=false}
