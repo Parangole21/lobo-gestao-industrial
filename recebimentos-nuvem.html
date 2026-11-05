@@ -24,7 +24,19 @@ async function reload(){
   for(const v of [p?.number||r.purchaseId||'',r.date||'',String(r.materials?.malha?.kg??''),r.invoice||'']){const td=document.createElement('td');td.textContent=v;tr.append(td)}
   const td=document.createElement('td'),btn=document.createElement('button');btn.textContent='Editar';btn.type='button';btn.onclick=()=>{
    editing=r;$('purchase').value=r.purchaseId||r.purchase_id||'';$('date').value=r.date||'';$('malhakg').value=r.materials?.malha?.kg??'';$('invoice').value=r.invoice||'';$('notes').value=r.notes||'';window.scrollTo(0,0)
-  };td.append(btn);tr.append(td);return tr;
+  };td.append(btn);
+ const del=document.createElement('button');del.type='button';del.textContent='Excluir';del.style.background='#80322e';
+ del.onclick=async()=>{
+  if(!confirm('Excluir este registro do Supabase? Esta ação é permanente.'))return;
+  del.disabled=true;
+  try{
+   await controller.remove('fabric_receipts',r);
+   if(editing?.id===r.id){editing=null;$('receipt').reset()}
+   await reload();$('status').textContent='Registro excluído do Supabase.';
+  }catch(err){$('status').textContent='Não foi possível excluir: '+err.message}
+  finally{del.disabled=false}
+ };
+ td.append(del);tr.append(td);return tr;
  }));
  $('status').textContent=receipts.length+' recebimento(s) carregado(s) do Supabase.';
 }
