@@ -25,7 +25,19 @@ async function reload(){
   const tr=document.createElement('tr');[purchaseName(l.parentId||l.purchaseId||l.purchase_id),l.brand,l.model||l.modelo,l.quantity||l.qty,l.stage||l.status].forEach(v=>cell(tr,v));
   const btn=document.createElement('button');btn.type='button';btn.textContent='Editar';btn.onclick=()=>{
    editing=l;$('purchase').value=l.parentId||l.purchaseId||l.purchase_id||'';$('brand').value=l.brand||'';$('model').value=l.model||l.modelo||'';$('quantity').value=l.quantity||l.qty||'';$('client').value=l.client||'';$('invoice').value=l.invoice||'';$('stage').value=l.stage||l.status||'Corte';$('notes').value=l.notes||'';window.scrollTo(0,0)
-  };const td=document.createElement('td');td.append(btn);tr.append(td);return tr;
+  };const td=document.createElement('td');td.append(btn);
+ const del=document.createElement('button');del.type='button';del.textContent='Excluir';del.style.background='#80322e';
+ del.onclick=async()=>{
+  if(!confirm('Excluir este registro do Supabase? Esta ação é permanente.'))return;
+  del.disabled=true;
+  try{
+   await controller.remove('production_lots',l);
+   if(editing?.id===l.id){editing=null;$('lot-form').reset()}
+   await reload();$('status').textContent='Registro excluído do Supabase.';
+  }catch(err){$('status').textContent='Não foi possível excluir: '+err.message}
+  finally{del.disabled=false}
+ };
+ td.append(del);tr.append(td);return tr;
  }));
  $('cuts').replaceChildren(...cloud.fabric_cuts.map(c=>{const tr=document.createElement('tr');const kg=Number(c.kg||c.kgCut||c.kgCortados||0),pieces=Number(c.pieces||c.quantity||c.pecas||0);[purchaseName(c.parentId||c.purchaseId||c.purchase_id),kg||'—',pieces||'—',kg>0?(pieces/kg).toFixed(2):'—'].forEach(v=>cell(tr,v));return tr}));
  $('costs').replaceChildren(...cloud.lot_costs.map(c=>{const tr=document.createElement('tr');cell(tr,c.id);cell(tr,'Cadastrado no Supabase');return tr}));
