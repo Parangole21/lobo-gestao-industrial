@@ -50,7 +50,8 @@ export class LoboRemoteStore {
     if(!updatedAt)throw new Error('Versão anterior obrigatória para edição segura.');
     const q='?'+this.key(table)+'=eq.'+encodeURIComponent(id)+'&updated_at=eq.'+encodeURIComponent(updatedAt);
     // O schema não garante um trigger de updated_at: avançar a versão na própria gravação.
-    const result=await this.request(table,'PATCH',q,{...patch,updated_at:new Date().toISOString()});
+    const nextVersion=new Date(Math.max(Date.now(),Date.parse(updatedAt)+1)).toISOString();
+    const result=await this.request(table,'PATCH',q,{...patch,updated_at:nextVersion});
     if(result?.length!==1)throw new Error('Conflito: registro alterado ou excluído em outro computador. Recarregue antes de editar.');
     return result[0];
   }
