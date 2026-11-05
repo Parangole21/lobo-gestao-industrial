@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lobo Industrial — Diagnóstico da nuvem</title>
+<style>body{font:16px system-ui,Arial;background:#f5f7fa;color:#17243a;margin:0;padding:24px}main{max-width:760px;margin:auto;background:#fff;padding:26px;border-radius:12px;box-shadow:0 2px 12px #0001}label{display:block;margin:16px 0 5px}input,button{font:inherit;padding:11px;border-radius:7px;border:1px solid #abb7c6}input{width:100%;box-sizing:border-box}button{margin-top:16px;background:#183b59;color:#fff;cursor:pointer}button:disabled{opacity:.6}table{border-collapse:collapse;width:100%;margin-top:18px}td,th{padding:12px;border-bottom:1px solid #ddd;text-align:left}#status{white-space:pre-wrap}small{color:#58697b}</style></head><body><main>
+<h1>Diagnóstico do banco central</h1>
+<p>Consulta somente leitura ao Supabase. Não altera dados nem importa registros do navegador.</p>
+<form id="login"><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required><label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" required><button id="submit">Consultar banco</button></form>
+<p id="status" role="status"></p><section id="results" hidden><h2>Registros encontrados no banco</h2><p id="identity"></p><table><thead><tr><th>Módulo</th><th>Quantidade</th></tr></thead><tbody id="rows"></tbody></table><button id="refresh" type="button">Atualizar consulta</button><button id="logout" type="button">Sair</button></section>
+<small>Ferramenta de diagnóstico da branch de desenvolvimento. Não é o sistema operacional definitivo.</small></main>
+<script type="module">
+import { LoboRemoteStore } from './src/remote-store.js';
+const URL='https://yldgebyfflbacicsfseh.supabase.co';
+const KEY='sb_publishable_5GCZ1S_XsQXLfmJbn94WmA_hINR9q38';
+const names={fabric_purchases:'Compras de malha',fabric_receipts:'Recebimentos',production_lots:'Lotes por marca',fabric_cuts:'Cortes',lot_costs:'Custos',lot_movements:'Movimentações'};
+const $=id=>document.getElementById(id);
+let session=null;
+const store=new LoboRemoteStore({url:URL,publishableKey:KEY,getAccessToken:async()=>session?.access_token||null});
+async function request(path,options={}) {
+ const response=await fetch(URL+path,{...options,headers:{apikey:KEY,'Content-Type':'application/json',...(session?.access_token?{Authorization:'Bearer '+session.access_token}:{}),...(options.headers||{})},cache:'no-store'});
+ const data=await response.json().catch(()=>null);
+ if(!response.ok)throw Error(data?.msg||data?.message||'Erro HTTP '+response.status);
+ return data;
+}
+async function refresh(){
+ $('status').textContent='Consultando tabelas...';
+ const rows=await Promise.all(Object.keys(names).map(async table=>{
+  const records=await store.list(table);
+  return [table,records.length];
+ }));
+ $('rows').replaceChildren(...rows.map(([table,count])=>{
+  const tr=document.createElement('tr'),name=document.createElement('td'),value=document.createElement('td');
+  name.textContent=names[table];value.textContent=String(count);tr.append(name,value);return tr;
+ }));
+ $('status').textContent='Consulta concluída. Nenhum registro foi alterado.';
+}
+$('login').addEventListener('submit',async e=>{
+ e.preventDefault();$('submit').disabled=true;$('status').textContent='Validando login...';
+ try{
+  const auth=await request('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})});
+  session={access_token:auth.access_token};
+  $('password').value='';
+  const profiles=await request('/rest/v1/profiles?select=role,active&user_id=eq.'+encodeURIComponent(auth.user.id));
+  if(profiles.length!==1||profiles[0].active!==true||profiles[0].role!=='admin')throw Error('Este perfil não está ativo como administrador.');
+  $('identity').textContent='Login validado: '+auth.user.email;
+  await refresh();
+  $('results').hidden=false;$('login').hidden=true;
+ }catch(err){session=null;$('results').hidden=true;$('status').textContent='Não foi possível consultar: '+err.message}
+ finally{$('submit').disabled=false}
+});
+$('refresh').addEventListener('click',async()=>{try{await refresh()}catch(e){$('status').textContent=e.message}});
+$('logout').addEventListener('click',()=>{session=null;$('results').hidden=true;$('login').hidden=false;$('status').textContent='Sessão encerrada.'});
+</script></body></html>
