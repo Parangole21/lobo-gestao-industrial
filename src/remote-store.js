@@ -37,7 +37,10 @@ export class LoboRemoteStore {
     return rows[0]||null;
   }
   async create(table,record) {
-    if(!record?.[this.key(table)])throw new Error('Identificador obrigatório para inclusão idempotente.');
+    if(table==='lot_movements') {
+      if(!record?.lot_id||!record?.stage)throw new Error('Movimentação exige lote e etapa.');
+      if(record?.id && typeof record.id !== 'string')throw new Error('ID de movimentação inválido.');
+    } else if(!record?.[this.key(table)])throw new Error('Identificador obrigatório para inclusão idempotente.');
     const result=await this.request(table,'POST','',record);
     if(result?.length!==1)throw new Error('Inclusão não confirmada pelo banco.');
     return result[0];
