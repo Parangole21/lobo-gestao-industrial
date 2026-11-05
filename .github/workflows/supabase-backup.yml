@@ -1,0 +1,59 @@
+name: Backup criptografado do Supabase
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_ENCRYPTION_PASSWORD: ${{ secrets.BACKUP_ENCRYPTION_PASSWORD }}
+    steps:
+      - name: Verificar configuração obrigatória
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$SUPABASE_DB_URL" || -z "$BACKUP_ENCRYPTION_PASSWORD" ]]; then
+            echo "::error::Configure os secrets SUPABASE_DB_URL e BACKUP_ENCRYPTION_PASSWORD antes de ativar os backups."
+            exit 1
+          fi
+          if [[ ${#BACKUP_ENCRYPTION_PASSWORD} -lt 24 ]]; then
+            echo "::error::A senha de criptografia deve ter pelo menos 24 caracteres."
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Exportar funções, estrutura e dados
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/db-export"
+          cd "$RUNNER_TEMP/db-export"
+          supabase db dump --db-url "$SUPABASE_DB_URL" --role-only -f roles.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" --data-only --use-copy -x "storage.buckets_vectors" -x "storage.vector_indexes" -f data.sql
+          test -s schema.sql
+          test -s data.sql
+          tar -czf "$RUNNER_TEMP/backup.tar.gz" roles.sql schema.sql data.sql
+          gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 --s2k-digest-algo SHA256 --passphrase-fd 3 --output "$RUNNER_TEMP/supabase-backup.tar.gz.gpg" "$RUNNER_TEMP/backup.tar.gz" 3<<< "$BACKUP_ENCRYPTION_PASSWORD"
+          test -s "$RUNNER_TEMP/supabase-backup.tar.gz.gpg"
+          rm -f roles.sql schema.sql data.sql "$RUNNER_TEMP/backup.tar.gz"
+
+      - name: Guardar somente arquivo criptografado por 15 dias
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/supabase-backup.tar.gz.gpg
+          retention-days: 15
+          if-no-files-found: error
+          compression-level: 0
