@@ -6,7 +6,7 @@ export class LoboRemoteStore {
   constructor({url, publishableKey, getAccessToken}) {
     if (!url || !publishableKey || typeof getAccessToken !== 'function') throw new Error('Configuração incompleta.');
     this.url = url.replace(/\/$/, '');
-    this.key = publishableKey;
+    this.publishableKey = publishableKey;
     this.getAccessToken = getAccessToken;
   }
   static tables = Object.freeze(['fabric_purchases','fabric_receipts','production_lots','fabric_cuts','lot_movements','lot_costs']);
@@ -21,7 +21,7 @@ export class LoboRemoteStore {
     if (!token) throw new Error('Sessão expirada. Entre novamente antes de alterar dados.');
     const response = await fetch(this.url+'/rest/v1/'+table+query,{
       method,
-      headers: {apikey:this.key,Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json',Prefer:'return=representation'},
+      headers: {apikey:this.publishableKey,Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json',Prefer:'return=representation'},
       ...(data === undefined ? {} : {body:JSON.stringify(data)}),
       cache:'no-store'
     });
