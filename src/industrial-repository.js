@@ -41,6 +41,11 @@ export class LoboIndustrialRepository {
     const {_updatedAt,...data}=entity;
     if (!id||!_updatedAt) throw new Error('ID e versão são obrigatórios para editar.');
     const patch={data,updated_by:userId};
+    if (table==='fabric_receipts'||table==='fabric_cuts'||table==='production_lots') {
+      const purchaseId=entity.purchase_id||entity.purchaseId||entity.parentId;
+      if (!purchaseId) throw new Error('Vínculo com compra obrigatório.');
+      patch.purchase_id=purchaseId;
+    }
     return this.store.update(table,id,_updatedAt,patch);
   }
   async remove(table,entity) {
