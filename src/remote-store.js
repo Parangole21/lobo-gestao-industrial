@@ -49,7 +49,8 @@ export class LoboRemoteStore {
     if(table==='lot_movements') throw new Error('Movimentações são eventos: não é permitida edição por este método.');
     if(!updatedAt)throw new Error('Versão anterior obrigatória para edição segura.');
     const q='?'+this.key(table)+'=eq.'+encodeURIComponent(id)+'&updated_at=eq.'+encodeURIComponent(updatedAt);
-    const result=await this.request(table,'PATCH',q,patch);
+    // O schema não garante um trigger de updated_at: avançar a versão na própria gravação.
+    const result=await this.request(table,'PATCH',q,{...patch,updated_at:new Date().toISOString()});
     if(result?.length!==1)throw new Error('Conflito: registro alterado ou excluído em outro computador. Recarregue antes de editar.');
     return result[0];
   }
