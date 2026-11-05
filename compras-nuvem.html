@@ -15,7 +15,19 @@ async function authRequest(path,body){
 async function reload(){
  $('status').textContent='Consultando banco...';records=await controller.list('fabric_purchases');$('rows').replaceChildren(...records.map(p=>{
  const tr=document.createElement('tr');for(const value of [p.number||'',p.fabricBrand||'',String(p.kg??''),p.invoice||'']){const td=document.createElement('td');td.textContent=value;tr.append(td)}
- const td=document.createElement('td'),btn=document.createElement('button');btn.textContent='Editar';btn.type='button';btn.onclick=()=>{editing=p;for(const key of ['number','fabricBrand','kg','invoice','orderValue'])$(key).value=p[key]??'';window.scrollTo(0,0)};td.append(btn);tr.append(td);return tr;
+ const td=document.createElement('td'),btn=document.createElement('button');btn.textContent='Editar';btn.type='button';btn.onclick=()=>{editing=p;for(const key of ['number','fabricBrand','kg','invoice','orderValue'])$(key).value=p[key]??'';window.scrollTo(0,0)};td.append(btn);
+ const del=document.createElement('button');del.type='button';del.textContent='Excluir';del.style.background='#80322e';
+ del.onclick=async()=>{
+  if(!confirm('Excluir este registro do Supabase? Esta ação é permanente.'))return;
+  del.disabled=true;
+  try{
+   await controller.remove('fabric_purchases',p);
+   if(editing?.id===p.id){editing=null;$('purchase').reset()}
+   await reload();$('status').textContent='Registro excluído do Supabase.';
+  }catch(err){$('status').textContent='Não foi possível excluir: '+err.message}
+  finally{del.disabled=false}
+ };
+ td.append(del);tr.append(td);return tr;
  }));$('status').textContent=records.length+' compra(s) carregada(s) do Supabase.';
 }
 $('login').onsubmit=async e=>{
