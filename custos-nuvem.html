@@ -9,13 +9,13 @@ body{font:15px system-ui,Arial;background:#f5f7fa;color:#172b42;margin:0}main{ma
 <h2>Custos cadastrados</h2><table><thead><tr><th>Lote</th><th>Peças boas</th><th>Avarias</th><th>Total</th><th>Unitário bom</th><th>Ação</th></tr></thead><tbody id="rows"></tbody></table></section><p id="status" role="status"></p></main>
 <script type="module">
 import { LoboCloudController } from './src/cloud-controller.js';
-import { readSession, saveSession, clearSession, verifyAdminSession } from './src/auth-session.js';
+import { readSession, saveSession, clearSession, verifyAdminSession, getValidSession } from './src/auth-session.js';
 const URL='https://yldgebyfflbacicsfseh.supabase.co',KEY='sb_publishable_5GCZ1S_XsQXLfmJbn94WmA_hINR9q38',$=id=>document.getElementById(id);
 const totals=[['fabric','Malha'],['collarCuff','Gola / punho'],['ribana','Ribana'],['freightFabric','Frete da malha']];
 const units=[['cut','Corte'],['sewing','Costura'],['printing','Serigrafia'],['embroidery','Bordado'],['interlining','Entretela'],['tag','Tag'],['seal','Lacre'],['bags','Saquinhos'],['composition','Composição'],['courier','Frete motoboy']];
 const goodOnly=new Set(['tag','seal','bags','composition']);
 let session=null,lots=[],costs=[],editing=null;
-const ctl=new LoboCloudController({url:URL,publishableKey:KEY,getAccessToken:async()=>session?.access_token,getUserId:async()=>session?.user_id});
+const ctl=new LoboCloudController({url:URL,publishableKey:KEY,getAccessToken:async()=>{session=await getValidSession(URL,KEY);return session?.access_token},getUserId:async()=>session?.user_id});
 const money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 for(const [id,label] of totals){const l=document.createElement('label');l.textContent=label;const i=document.createElement('input');i.id='t-'+id;i.type='number';i.min='0';i.step='0.01';i.placeholder='0,00';i.addEventListener('input',preview);l.append(i);$('total-fields').append(l)}
 for(const [id,label] of units){const l=document.createElement('label');l.textContent=label;const i=document.createElement('input');i.id='u-'+id;i.type='number';i.min='0';i.step='0.01';i.placeholder='0,00';i.addEventListener('input',preview);l.append(i);$('unit-fields').append(l)}
@@ -48,6 +48,8 @@ $('login').onsubmit=async e=>{
   const r=await fetch(URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})});
   const d=await r.json();if(!r.ok||!d.access_token)throw Error(d.msg||d.message||'Login inválido');
   session=saveSession(d);$('password').value='';
+  session=await getValidSession(URL,KEY);
+  if(!session)throw Error('Sessão expirada.');
   await verifyAdminSession(URL,KEY,session);
   await reload();$('identity').textContent='Conectado: '+d.user.email;$('auth').hidden=true;$('app').hidden=false;
  }catch(e){session=null;clearSession();$('status').textContent=e.message}finally{$('enter').disabled=false}
