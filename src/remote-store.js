@@ -10,6 +10,8 @@ export class LoboRemoteStore {
     this.getAccessToken = getAccessToken;
   }
   static tables = Object.freeze(['fabric_purchases','fabric_receipts','production_lots','fabric_cuts','lot_movements','lot_costs']);
+  // lot_costs usa lot_id na versão atual; demais tabelas usam id.
+  static keys = Object.freeze({fabric_purchases:'id',fabric_receipts:'id',production_lots:'id',fabric_cuts:'id',lot_movements:'id',lot_costs:'lot_id'});
   checkTable(table) {
     if (!LoboRemoteStore.tables.includes(table)) throw new Error('Tabela não permitida: '+table);
   }
@@ -28,27 +30,28 @@ export class LoboRemoteStore {
     if(!response.ok)throw new Error('Falha ao salvar no banco ('+response.status+'): '+(result?.message||result?.details||raw));
     return result;
   }
-  async list(table) { return this.request(table,'GET','?select=*&order=created_at.desc&limit=10000'); }
+  async list(table) { return this.request(table,'GET','?select=*&limit=10000'); }
+  key(table) { this.checkTable(table); return LoboRemoteStore.keys[table]; }
   async get(table,id) {
-    const rows=await this.request(table,'GET','?id=eq.'+encodeURIComponent(id)+'&select=*&limit=1');
+    const rows=await this.request(table,'GET','?'+this.key(table)+'=eq.'+encodeURIComponent(id)+'&select=*&limit=1');
     return rows[0]||null;
   }
   async create(table,record) {
-    if(!record?.id)throw new Error('ID obrigatório para inclusão idempotente.');
+    if(!record?.[this.key(table)])throw new Error('Identificador obrigatório para inclusão idempotente.');
     const result=await this.request(table,'POST','',record);
     if(result?.length!==1)throw new Error('Inclusão não confirmada pelo banco.');
     return result[0];
   }
   async update(table,id,updatedAt,patch) {
     if(!updatedAt)throw new Error('Versão anterior obrigatória para edição segura.');
-    const q='?id=eq.'+encodeURIComponent(id)+'&updated_at=eq.'+encodeURIComponent(updatedAt);
+    const q='?'+this.key(table)+'=eq.'+encodeURIComponent(id)+'&updated_at=eq.'+encodeURIComponent(updatedAt);
     const result=await this.request(table,'PATCH',q,patch);
     if(result?.length!==1)throw new Error('Conflito: registro alterado ou excluído em outro computador. Recarregue antes de editar.');
     return result[0];
   }
   async remove(table,id,updatedAt) {
     if(!updatedAt)throw new Error('Versão anterior obrigatória para exclusão segura.');
-    const q='?id=eq.'+encodeURIComponent(id)+'&updated_at=eq.'+encodeURIComponent(updatedAt);
+    const q='?'+this.key(table)+'=eq.'+encodeURIComponent(id)+'&updated_at=eq.'+encodeURIComponent(updatedAt);
     const result=await this.request(table,'DELETE',q);
     if(result?.length!==1)throw new Error('Conflito: registro alterado ou excluído em outro computador. Recarregue antes de excluir.');
     return result[0];
