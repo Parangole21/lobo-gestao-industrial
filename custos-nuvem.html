@@ -38,7 +38,19 @@ async function reload(){
   const td=document.createElement('td'),btn=document.createElement('button');btn.type='button';btn.textContent='Editar';btn.onclick=()=>{
    editing=c;$('lot').value=c.id;$('cutPieces').value=c.cutPieces??'';$('goodPieces').value=c.goodPieces??'';$('damagedPieces').value=c.damagedPieces??'';
    for(const [id] of totals)$('t-'+id).value=c.totalCosts?.[id]??'';for(const [id] of units)$('u-'+id).value=c.unitCosts?.[id]??'';preview();window.scrollTo(0,0)
-  };td.append(btn);tr.append(td);return tr;
+  };td.append(btn);
+  const del=document.createElement('button');del.type='button';del.textContent='Excluir';del.style.background='#80322e';
+  del.onclick=async()=>{
+   if(!confirm('Excluir permanentemente os custos deste lote no Supabase?'))return;
+   del.disabled=true;
+   try{
+    await ctl.remove('lot_costs',c);
+    if(editing?.id===c.id){editing=null;$('cost-form').reset();preview()}
+    await reload();$('status').textContent='Custos excluídos do banco.';
+   }catch(err){$('status').textContent='Exclusão não concluída: '+err.message}
+   finally{del.disabled=false}
+  };
+  td.append(del);tr.append(td);return tr;
  }));
  $('status').textContent=costs.length+' composição(ões) de custos carregada(s) do Supabase.';
 }
