@@ -1,0 +1,57 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lobo Industrial — Cortes na nuvem</title><style>body{font:15px system-ui,Arial;background:#f5f7fa;color:#172b42;margin:0}main{max-width:960px;margin:30px auto;background:white;padding:24px;border-radius:12px}h1{font-size:24px}label{display:block;margin:12px 0 4px;font-weight:600}input,select,button{font:inherit;padding:10px;border:1px solid #b4c1cf;border-radius:7px}input,select{width:100%;box-sizing:border-box}button{background:#193d5b;color:white;cursor:pointer;margin:12px 8px 0 0}button:disabled{opacity:.6}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left}#status{white-space:pre-wrap}.muted{color:#627080}section[hidden]{display:none}</style></head><body><main><h1>Corte de malha — Supabase</h1><p class="muted">Protótipo de testes. Os cortes são associados a uma compra; rendimento é calculado automaticamente. Não utilize dados reais nesta fase.</p>
+<section id="auth"><form id="login"><label>E-mail<input id="email" type="email" autocomplete="username" required></label><label>Senha<input id="password" type="password" autocomplete="current-password" required></label><button id="enter">Entrar</button></form></section>
+<section id="app" hidden><p id="identity"></p><form id="cut-form"><div class="grid"><label>Compra de origem<select id="purchase" required></select></label><label>Kg cortados<input id="kg" type="number" min="0.001" step="0.001" required></label><label>Peças renderam<input id="pieces" type="number" min="1" step="1" required></label><label>Data<input id="date" type="date" required></label></div><p id="yield"></p><button id="save">Salvar corte no banco</button><button id="cancel" type="button">Cancelar edição</button></form><button id="reload" type="button">Atualizar do banco</button><button id="logout" type="button">Sair</button><table><thead><tr><th>Compra</th><th>Kg</th><th>Peças</th><th>Peças/kg</th><th>Ação</th></tr></thead><tbody id="rows"></tbody></table></section><p id="status" role="status"></p></main>
+<script type="module">
+import { LoboCloudController } from './src/cloud-controller.js';
+const URL='https://yldgebyfflbacicsfseh.supabase.co',KEY='sb_publishable_5GCZ1S_XsQXLfmJbn94WmA_hINR9q38',$=id=>document.getElementById(id);
+let session=null,editing=null,purchases=[],cuts=[];
+const ctl=new LoboCloudController({url:URL,publishableKey:KEY,getAccessToken:async()=>session?.access_token,getUserId:async()=>session?.user_id});
+function updateYield(){const kg=Number($('kg').value),pieces=Number($('pieces').value);$('yield').textContent=kg>0&&pieces>0?'Rendimento: '+(pieces/kg).toFixed(2)+' peças/kg':'Rendimento: —'}
+$('kg').oninput=updateYield;$('pieces').oninput=updateYield;
+async function reload(){
+ $('status').textContent='Consultando Supabase...';
+ [purchases,cuts]=await Promise.all([ctl.list('fabric_purchases'),ctl.list('fabric_cuts')]);
+ const old=$('purchase').value;
+ $('purchase').replaceChildren(...purchases.map(p=>{const opt=document.createElement('option');opt.value=p.id;opt.textContent=(p.number||p.id)+' — '+(p.fabricBrand||'Malha');return opt}));
+ if(purchases.some(p=>p.id===old))$('purchase').value=old;
+ $('rows').replaceChildren(...cuts.map(c=>{
+  const tr=document.createElement('tr'),kg=Number(c.kg||c.kgCut||c.kgCortados||0),pieces=Number(c.pieces||c.quantity||c.pecas||0);
+  const purchase=purchases.find(p=>p.id===(c.parentId||c.purchaseId||c.purchase_id));
+  for(const v of [purchase?.number||c.parentId||'—',kg,pieces,kg>0?(pieces/kg).toFixed(2):'—']){const td=document.createElement('td');td.textContent=String(v);tr.append(td)}
+  const td=document.createElement('td'),btn=document.createElement('button');btn.type='button';btn.textContent='Editar';btn.onclick=()=>{
+   editing=c;$('purchase').value=c.parentId||c.purchaseId||c.purchase_id||'';$('kg').value=kg;$('pieces').value=pieces;$('date').value=c.date||new Date().toLocaleDateString('en-CA');updateYield();window.scrollTo(0,0)
+  };td.append(btn);tr.append(td);return tr;
+ }));
+ $('status').textContent=cuts.length+' corte(s) carregado(s) diretamente do banco.';
+}
+$('login').onsubmit=async e=>{
+ e.preventDefault();$('enter').disabled=true;$('status').textContent='Validando acesso...';
+ try{
+  const r=await fetch(URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})});
+  const d=await r.json();if(!r.ok||!d.access_token)throw Error(d.msg||d.message||'Login inválido');
+  session={access_token:d.access_token,user_id:d.user.id};$('password').value='';
+  const p=await fetch(URL+'/rest/v1/profiles?select=active,role&user_id=eq.'+encodeURIComponent(d.user.id),{headers:{apikey:KEY,Authorization:'Bearer '+session.access_token}});
+  if(!p.ok)throw Error('Não foi possível consultar o perfil');
+  const profiles=await p.json();if(profiles.length!==1||profiles[0].active!==true||profiles[0].role!=='admin')throw Error('Perfil sem autorização.');
+  await reload();$('identity').textContent='Conectado: '+d.user.email;$('auth').hidden=true;$('app').hidden=false;
+ }catch(err){session=null;$('status').textContent=err.message}finally{$('enter').disabled=false}
+};
+$('cut-form').onsubmit=async e=>{
+ e.preventDefault();$('save').disabled=true;$('status').textContent='Gravando no Supabase...';
+ try{
+  const parentId=$('purchase').value,kg=Number($('kg').value),pieces=Number($('pieces').value);
+  if(!purchases.some(p=>p.id===parentId))throw Error('Selecione uma compra válida.');
+  if(!Number.isFinite(kg)||kg<=0||!Number.isInteger(pieces)||pieces<=0)throw Error('Informe kg e peças válidos.');
+  const purchase=purchases.find(p=>p.id===parentId);
+  const otherKg=cuts.filter(c=>c.id!==editing?.id&&(c.parentId||c.purchaseId||c.purchase_id)===parentId).reduce((sum,c)=>sum+Number(c.kg||c.kgCut||c.kgCortados||0),0);
+  if(Number(purchase.kg)>0&&kg+otherKg>Number(purchase.kg)+0.00001)throw Error('Kg cortados excedem a quantidade comprada.');
+  const fields={parentId,kg,pieces,date:$('date').value};
+  const record=editing?{...editing,...fields}:{id:crypto.randomUUID(),...fields};
+  await ctl.save('fabric_cuts',record);editing=null;$('cut-form').reset();updateYield();await reload();$('status').textContent='Corte confirmado no Supabase.';
+ }catch(err){$('status').textContent='Não foi salvo: '+err.message}finally{$('save').disabled=false}
+};
+$('cancel').onclick=()=>{editing=null;$('cut-form').reset();updateYield()};
+$('reload').onclick=()=>reload().catch(e=>$('status').textContent=e.message);
+$('logout').onclick=()=>{session=null;editing=null;cuts=[];purchases=[];$('app').hidden=true;$('auth').hidden=false;$('status').textContent='Sessão encerrada.'};
+$('date').value=new Date().toLocaleDateString('en-CA');
+</script></body></html>
