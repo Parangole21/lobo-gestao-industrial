@@ -80,3 +80,75 @@ test('local edits survive a remote lot deletion and produce a visible conflict',
 test('failed optimistic delete preserves the local lot',async()=>{const h=harness(),lot={id:'l'};h.seed({lots:[lot],costData:{}});h.run("cloudSession={access_token:'test'}");h.context.fetch=async(url,o={})=>({ok:true,json:async()=>url.includes('/lot_costs')?[]:o.method==='DELETE'?[]:[{id:'l',data:lot,updated_at:'v1'}]});h.context.lotInput=lot;assert.equal(await h.run('deleteProductionLot(lotInput)'),false);assert.equal(state(h).lots.length,1);assert.match(h.alerts.at(-1),/alterado/);});
 test('receipt total uses invoice total once, with legacy item-total fallback',()=>{const h=harness();assert.equal(h.run('getTotal({invoiceTotal:500,materials:{a:{total:50},b:{total:30}}})'),500);assert.equal(h.run('getTotal({materials:{a:{total:50},b:{total:30}}})'),80);});
 test('restoring a previous snapshot preserves its recovered pieces and extra costs',()=>{const h=harness();const first={good:70,damaged:10,pending:20,total:1000,items:[item('malha',1000,0,'total')],complements:[{origin:'pendente',recovered:20,additional:10,items:[item('tag',0.5,20)]}]};const latest={good:90,damaged:10,pending:0,total:1200,items:[item('malha',1200,0,'total')]};setupCost(h,{history:[first,latest],good:90,damaged:10,pending:0});h.el('cost-history').onclick({target:{closest:()=>({dataset:{costDelete:'1'}})}});const d=state(h).costData.l1;assert.equal(d.good,90);assert.equal(d.pending,0);assert.equal(d.damaged,10);assert.equal(h.run('costTotal(costData.l1)'),1010);assert.equal(d.items.reduce((n,x)=>n+x.total,0),1010);});
+
+function materialServer(h,purchases,receipts=[]){
+ h.context.mockPurchases=purchases.map(data=>({id:data.id,data,updated_at:'2026-11-06T12:00:00Z'}));
+ h.context.mockReceipts=receipts.map(data=>({id:data.id,data,updated_at:'2026-11-06T12:00:00Z'}));
+ h.context.sent=[];
+ h.run("cloudSession={access_token:'test',user_id:'u'};cloudMaterialsRequest=async(table,method,body)=>{sent.push({table,method,body});if(method!=='GET')throw Error('Unexpected write');return table==='fabric_purchases'?mockPurchases:mockReceipts}");
+}
+function materialBase(h,purchases=[],receipts=[]){
+ const section=rows=>Object.fromEntries(rows.map(p=>[p.id,h.run('cloudLotJson('+JSON.stringify(p)+')')]));
+ h.storage.set('lobo-industrial-materiais-base-v61',JSON.stringify({purchases:section(purchases),receipts:section(receipts)}));
+}
+test('stale PC reconciles deleted MAL-0001 before checking reused cloud number',async()=>{
+ const h=harness(),old={id:'old-purchase',number:'MAL-0001',kg:500},current={id:'current-purchase',number:'MAL-0001',kg:600};
+ h.seed({parents:[old],records:[],cuts:[],lots:[],costData:{}});materialBase(h,[old]);materialServer(h,[current]);
+ await h.run('cloudSyncMaterials(true)');
+ assert.deepEqual(state(h).parents,[current]);assert.match(h.el('cloud-sync-message').textContent,/Concluído/);
+ assert.ok([...h.storage.keys()].some(k=>k.startsWith('lobo-exclusao-remota-backup-fabric_purchases-old-purchase-')));
+ assert.ok(h.context.sent.every(r=>r.method==='GET'));
+ await h.run('cloudSyncMaterials(true)');assert.deepEqual(state(h).parents,[current]);assert.ok(h.context.sent.every(r=>r.method==='GET'));
+});
+test('stale receipt is backed up while deleted purchase number is reused',async()=>{
+ const h=harness(),old={id:'old',number:'MAL-0001'},receipt={id:'receipt',purchaseId:'old',materials:{malha:{kg:10}}},current={id:'new',number:'MAL-0001'};
+ h.seed({parents:[old],records:[receipt]});materialBase(h,[old],[receipt]);materialServer(h,[current]);await h.run('cloudSyncMaterials(true)');
+ assert.deepEqual(state(h).parents,[current]);assert.deepEqual(state(h).records,[]);
+ assert.ok([...h.storage.keys()].some(k=>k.startsWith('lobo-exclusao-remota-backup-fabric_receipts-receipt-')));
+});
+test('edited stale purchase is preserved for reconciliation, never discarded to reuse a number',async()=>{
+ const h=harness(),old={id:'old',number:'MAL-0001',kg:500},edited={...old,kg:501},current={id:'new',number:'MAL-0001'};
+ h.seed({parents:[edited]});materialBase(h,[old]);materialServer(h,[current]);await h.run('cloudSyncMaterials(true)');
+ assert.deepEqual(state(h).parents,[edited]);assert.match(h.el('cloud-sync-message').textContent,/alterações locais/);assert.ok(h.context.sent.every(r=>r.method==='GET'));
+});
+test('incoming cloud renumbering is reconciled before a number collision is reported',async()=>{
+ const h=harness(),old={id:'p',number:'MAL-0001',kg:500},updated={...old,number:'MAL-0002'},newPurchase={id:'new',number:'MAL-0001',kg:600};
+ h.seed({parents:[old]});materialBase(h,[old]);materialServer(h,[updated,newPurchase]);await h.run('cloudSyncMaterials(true)');
+ assert.deepEqual(state(h).parents,[updated,newPurchase]);assert.match(h.el('cloud-sync-message').textContent,/Concluído/);assert.ok(h.context.sent.every(r=>r.method==='GET'));
+});
+test('a genuinely new duplicate remains visible for explicit number repair',async()=>{
+ const h=harness(),local={id:'unsynced',number:'MAL-0001'},remote={id:'cloud',number:'MAL-0001'};
+ h.seed({parents:[local]});materialServer(h,[remote]);await h.run('cloudSyncMaterials(true)');
+ assert.deepEqual(state(h).parents,[local]);assert.match(h.el('cloud-conflict-details').innerHTML,/Manter compras separadas/);assert.match(h.el('cloud-sync-message').textContent,/números repetidos/);assert.ok(h.context.sent.every(r=>r.method==='GET'));
+});
+test('legacy baseline key order does not turn a stale purchase into a local edit',async()=>{
+ const h=harness(),old={id:'old',number:'MAL-0001',kg:500},current={id:'new',number:'MAL-0001'};
+ h.seed({parents:[old]});h.storage.set('lobo-industrial-materiais-base-v61',JSON.stringify({purchases:{old:JSON.stringify(old)},receipts:{}}));materialServer(h,[current]);await h.run('cloudSyncMaterials(true)');assert.deepEqual(state(h).parents,[current]);
+});
+test('new receipt linked to missing purchase prevents automatic retirement',async()=>{
+ const h=harness(),old={id:'old',number:'MAL-0001'},receipt={id:'new-receipt',purchaseId:'old',materials:{malha:{kg:10}}};h.seed({parents:[old],records:[receipt]});materialBase(h,[old]);materialServer(h,[{id:'new',number:'MAL-0001'}]);await h.run('cloudSyncMaterials(true)');assert.deepEqual(state(h).parents,[old]);assert.deepEqual(state(h).records,[receipt]);assert.match(h.el('cloud-sync-message').textContent,/alterações locais/);assert.ok(h.context.sent.every(r=>r.method==='GET'));
+});
+test('new cut linked to missing purchase prevents automatic retirement',async()=>{
+ const h=harness(),old={id:'old',number:'MAL-0001'},cut={id:'new-cut',parentId:'old',kg:10,pieces:40};h.seed({parents:[old],cuts:[cut]});materialBase(h,[old]);materialServer(h,[{id:'new',number:'MAL-0001'}]);await h.run('cloudSyncMaterials(true)');assert.deepEqual(state(h).parents,[old]);assert.deepEqual(state(h).cuts,[cut]);assert.match(h.el('cloud-sync-message').textContent,/alterações locais/);assert.ok(h.context.sent.every(r=>r.method==='GET'));
+});
+test('edited known cut linked to missing purchase prevents automatic retirement',async()=>{
+ const h=harness(),old={id:'old',number:'MAL-0001'},cut={id:'cut',parentId:'old',kg:10,pieces:40};h.seed({parents:[old],cuts:[{...cut,pieces:41}]});h.storage.set('lobo-industrial-cortes-cloud-base-v1',JSON.stringify({cut:h.run('cloudLotJson('+JSON.stringify(cut)+')')}));materialBase(h,[old]);materialServer(h,[{id:'new',number:'MAL-0001'}]);await h.run('cloudSyncMaterials(true)');assert.deepEqual(state(h).parents,[old]);assert.equal(state(h).cuts[0].pieces,41);assert.match(h.el('cloud-sync-message').textContent,/alterações locais/);
+});
+test('new brand linked to missing purchase prevents automatic retirement',async()=>{
+ const h=harness(),old={id:'old',number:'MAL-0001'},lot={id:'new-lot',parentId:'old',quantity:40};h.seed({parents:[old],lots:[lot]});materialBase(h,[old]);materialServer(h,[{id:'new',number:'MAL-0001'}]);await h.run('cloudSyncMaterials(true)');assert.deepEqual(state(h).parents,[old]);assert.deepEqual(state(h).lots,[lot]);assert.match(h.el('cloud-sync-message').textContent,/alterações locais/);
+});
+test('edited receipt is preserved when its former purchase number is reused',async()=>{
+ const h=harness(),old={id:'old',number:'MAL-0001'},receipt={id:'r',purchaseId:'old',materials:{malha:{kg:10}},invoiceTotal:100};h.seed({parents:[old],records:[{...receipt,invoiceTotal:101}]});materialBase(h,[old],[receipt]);materialServer(h,[{id:'new',number:'MAL-0001'}]);await h.run('cloudSyncMaterials(true)');assert.deepEqual(state(h).parents,[old]);assert.equal(state(h).records[0].invoiceTotal,101);assert.match(h.el('cloud-sync-message').textContent,/alterações locais/);assert.ok(h.context.sent.every(r=>r.method==='GET'));
+});
+test('backup write failure prevents retirement and preserves the stale purchase',async()=>{
+ const h=harness(),old={id:'old',number:'MAL-0001'};h.seed({parents:[old]});materialBase(h,[old]);materialServer(h,[{id:'new',number:'MAL-0001'}]);const original=h.context.localStorage.setItem;h.context.localStorage.setItem=(key,value)=>{if(key.startsWith('lobo-exclusao-remota-backup-'))throw Error('disk full');original(key,value)};await h.run('cloudSyncMaterials(true)');assert.deepEqual(state(h).parents,[old]);assert.match(h.el('cloud-sync-message').textContent,/disk full/);assert.ok(h.context.sent.every(r=>r.method==='GET'));
+});
+test('failed remote read cannot be mistaken for an empty cloud dataset',async()=>{
+ const h=harness(),old={id:'old',number:'MAL-0001'};h.seed({parents:[old]});materialBase(h,[old]);h.run("cloudSession={access_token:'test'};cloudMaterialsRequest=async()=>{throw Error('network failure')}");await h.run('cloudSyncMaterials(true)');assert.deepEqual(state(h).parents,[old]);assert.match(h.el('cloud-sync-message').textContent,/network failure/);
+});
+test('two-sided edits produce a field comparison rather than automatic number repair',async()=>{
+ const h=harness(),base={id:'p',number:'MAL-0001',kg:500},local={...base,kg:501},remote={...base,number:'MAL-0002',kg:502};h.seed({parents:[local]});materialBase(h,[base]);materialServer(h,[remote,{id:'new',number:'MAL-0001'}]);await h.run('cloudSyncMaterials(true)');assert.deepEqual(state(h).parents,[local]);assert.match(h.el('cloud-conflict-details').innerHTML,/Conflitos encontrados/);assert.match(h.el('cloud-sync-message').textContent,/divergentes/);assert.ok(h.context.sent.every(r=>r.method==='GET'));
+});
+test('corrupt baseline cannot trigger upload or retirement',async()=>{
+ const h=harness(),old={id:'old',number:'MAL-0001'};h.seed({parents:[old]});h.storage.set('lobo-industrial-materiais-base-v61','invalid-json');materialServer(h,[{id:'new',number:'MAL-0001'}]);await h.run('cloudSyncMaterials(true)');assert.deepEqual(state(h).parents,[old]);assert.match(h.el('cloud-sync-message').textContent,/Falha/);assert.ok(h.context.sent.every(r=>r.method==='GET'));
+});
