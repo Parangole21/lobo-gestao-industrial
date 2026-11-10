@@ -10,7 +10,7 @@ function harness() {
  const nodes = new Map(), storage = new Map(), alerts = [], requests=[];
  class Node {
   constructor(id){this.id=id;this.value='';this.textContent='';this.innerHTML='';this.style={};this.dataset={};this.disabled=false;this.checked=false;this.children=new Map();this.classes=new Set();this.classList={add:(x)=>this.classes.add(x),remove:(x)=>this.classes.delete(x),toggle:(x,b)=>b===undefined?(this.classes.has(x)?this.classes.delete(x):this.classes.add(x)):(b?this.classes.add(x):this.classes.delete(x))};}
-  addEventListener(){} scrollIntoView(){} focus(){} reset(){} click(){} replaceChildren(){}
+  addEventListener(){} setAttribute(){} scrollIntoView(){} focus(){} reset(){} click(){} replaceChildren(){}
   querySelector(selector){if(!this.children.has(selector))this.children.set(selector,new Node(selector));return this.children.get(selector);}
   querySelectorAll(){return [];} closest(){return null;}
  }
@@ -187,3 +187,69 @@ test('editing a complement accepts manual service quantities above recovery',()=
 test('invalid service numbers stay blocked while high valid quantities are allowed',()=>{for(const invalid of [{value:-1,qty:10,total:-10},{value:Infinity,qty:1,total:Infinity},{value:1,qty:-1,total:-1},{value:1,qty:1.5,total:1.5},{value:NaN,qty:1,total:NaN}]){const h=harness();setupCost(h);h.context.mockItems=[{id:'costura',mode:'individual',label:'costura',...invalid}];clickSave(h);assert.equal(state(h).costData.l1.history.length,0);assert.match(h.alerts.at(-1),/valores válidos/);}});
 test('inline history editor still rejects fractional service quantities',()=>{const h=harness();setupCost(h);clickSave(h);const before=JSON.stringify(state(h).costData.l1);const host=h.el('[data-history-editor="0"]');host.querySelector('[data-hgood]').value='90';host.querySelector('[data-hdamaged]').value='5';host.querySelector('[data-hpending]').value='5';const row=host.querySelector('[data-hitem="costura"]');row.querySelector('[data-hvalue]').value='1';row.querySelector('[data-hqty]').value='1.5';h.el('cost-history').onclick({target:{closest:()=>({dataset:{hsave:'0'}})}});assert.equal(JSON.stringify(state(h).costData.l1),before);assert.match(h.alerts.at(-1),/Revise valores/);});
 test('complement still rejects negative and fractional service quantities',()=>{for(const value of [-1,1.5]){const h=harness();setupCost(h);clickSave(h);h.context.mockExtra=[item('tag',0.5,value)];h.run('extraItems=()=>COST_ITEMS.map(([id,label,mode])=>mockExtra.find(x=>x.id===id)||{id,label,mode,value:0,qty:0,total:0});extraFromAvaria=false');h.el('extra-recovered').value='5';h.el('extra-save').onclick();assert.equal(state(h).costData.l1.good,90);assert.match(h.alerts.at(-1),/valores e quantidades/);}});
+
+
+test('brands on the same purchase display its MAL code without collapsing distinct records',()=>{
+  const h=harness();
+  h.seed({parents:[{id:'p1',number:'MAL-0001'},{id:'p2',number:'MAL-0002'}],lots:[
+    {id:'brand1',parentId:'p1',number:'LOT-0001',brand:'A',quantity:100},
+    {id:'brand2',parentId:'p1',number:'LOT-0002',brand:'B',quantity:200},
+    {id:'brand3',parentId:'p2',number:'LOT-0003',brand:'C',quantity:300}
+  ]});
+  h.run('showCostPage()');
+  assert.match(h.el('cost-lot').innerHTML,/value="brand1">A — MAL-0001/);
+  assert.match(h.el('cost-lot').innerHTML,/value="brand2">B — MAL-0001/);
+  assert.match(h.el('cost-lot').innerHTML,/value="brand3">C — MAL-0002/);
+  assert.equal(h.run('lots[1].number'),'LOT-0002');
+});
+
+test('sewing metrics compare elapsed periods and average only closed months with entries',()=>{
+  const h=harness();
+  h.context.rows=[
+    {production_date:'2026-09-02',quantity:1000},{production_date:'2026-10-10',quantity:100},
+    {production_date:'2026-10-11',quantity:300},{production_date:'2026-11-03',quantity:100},
+    {production_date:'2026-11-08',quantity:50},{production_date:'2026-11-09',quantity:40},
+    {production_date:'2026-11-10',quantity:60},{production_date:'2026-11-10',quantity:10}
+  ];
+  const result=h.run("sewingMetrics(rows,'2026-11','2026-11-10')");
+  assert.equal(result.monthTotal,260);
+  assert.equal(result.previousMonth,400);
+  assert.equal(result.comparablePreviousMonth,100);
+  assert.equal(result.lastWeek,150);
+  assert.equal(result.comparablePreviousWeek,100);
+  assert.equal(result.weekTotal,110);
+  assert.equal(result.average,700);
+  assert.equal(result.daily.length,4);
+});
+
+test('sewing entry saves to its own cloud table and retains the returned revision',async()=>{
+  const h=harness();
+  h.run("cloudSession={access_token:'token'};sewing.ready=true;sewing.types=[{id:'polo',name:'Polo'}]");
+  h.el('sewing-date').value='2026-01-05';
+  h.el('sewing-entry-type').value='polo';
+  h.el('sewing-quantity').value='350';
+  h.el('sewing-note').value='Turno da manhã';
+  h.context.fetch=async(url,options)=>{
+    assert.match(url,/\/sewing_entries$/);
+    assert.equal(options.method,'POST');
+    const payload=JSON.parse(options.body);
+    assert.equal(payload.quantity,350);
+    return {ok:true,json:async()=>[{...payload,id:'new',revision:1}]};
+  };
+  await h.el('sewing-entry-form').onsubmit({preventDefault(){}});
+  assert.equal(h.run('sewing.entries[0].revision'),1);
+  assert.equal(h.el('sewing-month').value,'2026-01');
+  assert.match(h.el('sewing-rows').innerHTML,/Turno da manhã/);
+});
+
+test('sewing edits use the fetched revision and a concurrent edit keeps local data intact',async()=>{
+  const h=harness();
+  h.run("cloudSession={access_token:'token'};sewing.ready=true;sewing.entries=[{id:'a',revision:1,quantity:100}]");
+  h.context.fetch=async(url,options)=>{
+    assert.match(url,/id=eq.a&revision=eq.1$/);
+    assert.equal(JSON.parse(options.body).revision,2);
+    return {ok:true,json:async()=>[]};
+  };
+  await assert.rejects(h.run("saveSewingRow('sewing_entries','PATCH',{quantity:200},sewing.entries[0])"),/mudou em outro computador/);
+  assert.equal(h.run('sewing.entries[0].quantity'),100);
+});

@@ -1,0 +1,35 @@
+name: Ativar Produção de Costura
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - sql/producao-costura.sql
+      - .github/workflows/producao-costura.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sewing-schema
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Criar tabelas e políticas da produção de costura
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${SUPABASE_DB_URL}" != *yldgebyfflbacicsfseh* ]]; then
+            echo "::error::A conexão do Supabase não corresponde ao projeto do Lobo Industrial."
+            exit 1
+          fi
+          command -v psql >/dev/null || { sudo apt-get update && sudo apt-get install -y postgresql-client; }
+          PGCONNECT_TIMEOUT=15 psql "${SUPABASE_DB_URL}" -X -v ON_ERROR_STOP=1 -f sql/producao-costura.sql
