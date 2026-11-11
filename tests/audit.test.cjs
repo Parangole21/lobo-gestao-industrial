@@ -395,3 +395,22 @@ test('calendar uses Bahia local dates and the movable holidays for Feira de Sant
  assert.deepEqual(holidays,{'2026-04-03':'Sexta-feira da Paixão','2026-06-04':'Corpus Christi'});
  assert.equal(h.run("productionDates(planPeriod('week','2026-07-02')).find(day=>day.date==='2026-07-02').working"),false);
 });
+
+test('monthly target and queue only count remaining production dates and update when a holiday is selected',()=>{
+ const h=harness();
+ h.run("planToday=()=> '2026-11-11'");
+ h.el('plan-period-type').value='month';
+ h.el('plan-period-date').value='2026-11-11';
+ h.run('showSewingPlan()');
+ h.el('plan-daily').value='400';
+ h.el('plan-capacity-form').onsubmit({preventDefault(){}});
+ assert.match(h.el('plan-capacity').innerHTML,/Meta dos dias restantes<\/span><strong>5\.200<\/strong><span>400 peças\/dia × 13 dias/);
+ assert.match(h.el('plan-output-summary').innerHTML,/Faltam para a meta<\/span><strong>5\.200/);
+ h.el('plan-calendar-list').onchange({target:{closest:()=>({dataset:{workDate:'2026-11-20'},checked:true})}});
+ assert.match(h.el('plan-capacity').innerHTML,/5\.600<\/strong><span>400 peças\/dia × 14 dias/);
+ assert.match(h.el('plan-output-summary').innerHTML,/Faltam para a meta<\/span><strong>5\.600/);
+ h.el('plan-output-pieces').value='450';
+ h.el('plan-output-form').onsubmit({preventDefault(){}});
+ assert.match(h.el('plan-capacity').innerHTML,/5\.200<\/strong><span>400 peças\/dia × 13 dias/);
+ assert.match(h.el('plan-output-summary').innerHTML,/Faltam para a meta<\/span><strong>5\.150/);
+});
