@@ -247,3 +247,85 @@ test('movement history groups all brand timelines by purchase and searches by MA
  assert.doesNotMatch(byClient,/<h4>Lobo<\/h4>/);
  assert.match(render('inexistente'),/Nenhum lote de marca encontrado/);
 });
+
+test('sewing plan caps 8,400 pieces at 8,000 and changing priorities changes the overflow lot',()=>{
+ const h=harness();
+ h.seed({
+  parents:[{id:'a',number:'MAL-0001',invoice:'10'},{id:'b',number:'MAL-0002',invoice:'11'}],
+  cuts:[{parentId:'a',pieces:5000},{parentId:'b',pieces:3400}],
+  lots:[{parentId:'b',brand:'Marca B',model:'Polo',quantity:3400,status:'Corte'}]
+ });
+ h.context.plan={daily:400,days:20,queue:['a','b'],estimates:{}};
+ const allocate=()=>JSON.parse(h.run('JSON.stringify({...allocateSewing(plan,sewingStock(plan)),selected:[...allocateSewing(plan,sewingStock(plan)).selected]})'));
+ let result=allocate();
+ assert.equal(result.capacity,8000);
+ assert.equal(result.ready,8000);
+ assert.equal(result.overflow,400);
+ assert.equal(result.free,0);
+ assert.equal(result.selected[1][1].lines[0].plannedReady,3000);
+ h.context.plan.queue.reverse();
+ result=allocate();
+ assert.equal(result.selected[0][1].ready,3400);
+ assert.equal(result.selected[1][1].outside,400);
+});
+
+test('sewing stock counts receipts, cuts and post-sewing pieces once and adjusts estimates as cuts are recorded',()=>{
+ const h=harness();
+ h.seed({
+  parents:[{id:'p',number:'MAL-0001',invoice:'123'},{id:'open',number:'MAL-0002',kg:100}],
+  records:[{purchaseId:'p',invoice:'123',materials:{malha:{kg:80}}},{purchaseId:'p',invoice:'124',materials:{malha:{kg:20}}}],
+  cuts:[{parentId:'p',kg:40,pieces:160}],
+  lots:[
+   {parentId:'p',brand:'Já costurada',quantity:60,status:'Embalagem'},
+   {parentId:'p',brand:'Em costura',model:'Polo',quantity:120,status:'Costura'},
+   {parentId:'p',brand:'Planejada',model:'Camiseta',quantity:200,status:'Corte'}
+  ]
+ });
+ h.context.plan={daily:100,days:2,queue:['p'],estimates:{p:{pieces:250,cutAtEntry:120}}};
+ const stock=JSON.parse(h.run('JSON.stringify(sewingStock(plan))'));
+ assert.equal(stock.length,1);
+ assert.deepEqual(stock[0].invoices,['123','124']);
+ assert.equal(stock[0].uncutKg,60);
+ assert.equal(stock[0].ready,100);
+ assert.equal(stock[0].estimate,210);
+ assert.equal(stock[0].lines[0].label,'Em costura · Polo');
+ assert.equal(stock[0].lines[0].ready,100);
+ const allocated=JSON.parse(h.run("JSON.stringify(allocateSewing(plan,sewingStock(plan)).selected.get('p'))"));
+ assert.equal(allocated.ready,100);
+ assert.equal(allocated.estimate,100);
+ assert.equal(allocated.outside,110);
+ assert.equal(allocated.lines[0].plannedEstimate,20);
+ assert.equal(allocated.lines[1].plannedEstimate,80);
+ h.run("cuts.push({parentId:'p',kg:60,pieces:210})");
+ assert.equal(h.run('sewingStock(plan)[0].estimate'),0);
+ assert.equal(h.run('sewingStock(plan)[0].ready'),310);
+});
+
+test('sewing planner UI keeps capacity and simulations per period and restores navigation',()=>{
+ const h=harness();
+ const date=h.el('plan-period-date'),type=h.el('plan-period-type');
+ date.value='2026-11-11';type.value='month';
+ h.seed({
+  parents:[{id:'x',number:'MAL-0001',invoice:'123'}],
+  records:[{purchaseId:'x',materials:{malha:{kg:30}}}]
+ });
+ h.run('showSewingPlan()');
+ assert.equal(h.el('page-planejamento').style.display,'block');
+ assert.equal(h.el('plan-period-label').textContent,'01/11/2026 a 30/11/2026');
+ assert.match(h.el('plan-stock').innerHTML,/MAL-0001[\s\S]*NF 123[\s\S]*A cortar/);
+ const preventDefault=()=>{};
+ h.el('plan-daily').value='400';h.el('plan-days').value='20';
+ h.el('plan-capacity-form').onsubmit({preventDefault});
+ h.el('plan-stock').onsubmit({preventDefault,target:{closest:()=>({dataset:{planEstimate:'x'},querySelector:()=>({value:'8400'})})}});
+ h.el('plan-add-all').onclick();
+ assert.match(h.el('plan-stock').innerHTML,/8\.000 peças no plano/);
+ assert.match(h.el('plan-stock').innerHTML,/400 ficam fora da capacidade/);
+ type.value='week';type.onchange();
+ assert.equal(h.el('plan-period-label').textContent,'09/11/2026 a 15/11/2026');
+ assert.equal(h.el('plan-days').value,5);
+ assert.doesNotMatch(h.el('plan-stock').innerHTML,/8\.000 peças no plano/);
+ type.value='month';type.onchange();
+ assert.match(h.el('plan-stock').innerHTML,/8\.000 peças no plano/);
+ h.run('showCutPage()');
+ assert.equal(h.el('page-planejamento').style.display,'none');
+});
