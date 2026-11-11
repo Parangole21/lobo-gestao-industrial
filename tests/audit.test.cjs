@@ -202,3 +202,48 @@ test('brands on the same purchase display its MAL code without collapsing distin
   assert.match(h.el('cost-lot').innerHTML,/value="brand3">C — MAL-0002/);
   assert.equal(h.run('lots[1].number'),'LOT-0002');
 });
+
+test('movement history groups all brand timelines by purchase and searches by MAL or invoice',()=>{
+ const h=harness();
+ const movement=(status,at)=>({status,at});
+ h.seed({
+  parents:[
+   {id:'p1',number:'MAL-0001',invoice:'10042',fabricBrand:'Caiman'},
+   {id:'p2',number:'MAL-0002',invoice:'10042',fabricBrand:'Outro fornecedor'}
+  ],
+  lots:[
+   {id:'a',parentId:'p1',number:'LOT-0001',brand:'Nato',client:'Cliente A',history:[
+    movement('Costura','2026-11-03T11:00:00Z'),movement('Corte','2026-11-02T11:00:00Z')
+   ]},
+   {id:'b',parentId:'p1',number:'LOT-0002',brand:'Lobo',history:[movement('Embalagem','2026-11-04T11:00:00Z')]},
+   {id:'c',parentId:'p2',number:'LOT-0003',brand:'Terceira'},
+   {id:'legacy',number:'LOT-0004',brand:'Marca antiga'}
+  ]
+ });
+ const render=query=>{
+  h.el('history-search').value=query;
+  h.el('history-search').oninput();
+  return h.el('lot-history').innerHTML;
+ };
+ const all=render('');
+ assert.equal((all.match(/<details class="history-group"/g)||[]).length,3);
+ assert.doesNotMatch(all,/data-history-group="[^"]+" open/);
+ assert.match(all,/LOT-0004/);
+ const byCode=render('mal-0001');
+ assert.match(byCode,/data-history-group="purchase:p1" open/);
+ assert.match(byCode,/NF 10042 · Caiman/);
+ assert.match(byCode,/2 marcas/);
+ assert.match(byCode,/<h4>Nato<\/h4>/);
+ assert.match(byCode,/<h4>Lobo<\/h4>/);
+ assert.match(byCode,/<strong>Corte<\/strong>[\s\S]*<strong>Costura<\/strong>/);
+ assert.match(byCode,/<strong>Embalagem<\/strong>/);
+ assert.doesNotMatch(byCode,/Terceira/);
+ const byInvoice=render('10042');
+ assert.equal((byInvoice.match(/<details class="history-group"/g)||[]).length,2);
+ assert.match(byInvoice,/Terceira/);
+ assert.doesNotMatch(byInvoice,/Marca antiga/);
+ const byClient=render('cliente a');
+ assert.match(byClient,/<h4>Nato<\/h4>/);
+ assert.doesNotMatch(byClient,/<h4>Lobo<\/h4>/);
+ assert.match(render('inexistente'),/Nenhum lote de marca encontrado/);
+});
