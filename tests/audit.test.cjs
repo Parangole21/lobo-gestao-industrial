@@ -329,3 +329,39 @@ test('sewing planner UI keeps capacity and simulations per period and restores n
  h.run('showCutPage()');
  assert.equal(h.el('page-planejamento').style.display,'none');
 });
+
+test('daily sewing progress carries a surplus or shortfall into the remaining target',()=>{
+ const h=harness();
+ const progress=pieces=>JSON.parse(h.run(`JSON.stringify(sewingProgress({daily:400,days:5},[['2024-04-01',${pieces}]]))`));
+ assert.deepEqual(progress(450),{produced:450,daysLeft:4,targetLeft:1550,budget:1550,gap:0});
+ assert.deepEqual(progress(350),{produced:350,daysLeft:4,targetLeft:1650,budget:1600,gap:50});
+ assert.deepEqual(progress(0),{produced:0,daysLeft:4,targetLeft:2000,budget:1600,gap:400});
+ assert.deepEqual(progress(2100),{produced:2100,daysLeft:4,targetLeft:0,budget:0,gap:0});
+});
+
+test('saving, correcting and deleting a daily sewing total updates its week and month',()=>{
+ const h=harness();
+ h.seed({parents:[{id:'p',number:'MAL-0001'}],cuts:[{parentId:'p',pieces:2200}]});
+ h.el('plan-period-type').value='week';
+ h.el('plan-period-date').value='2024-04-01';
+ h.run('showSewingPlan()');
+ const preventDefault=()=>{};
+ h.el('plan-daily').value='400';h.el('plan-days').value='5';
+ h.el('plan-capacity-form').onsubmit({preventDefault});
+ h.el('plan-add-all').onclick();
+ const outputDate=h.el('plan-output-date'),pieces=h.el('plan-output-pieces');
+ outputDate.value='2024-04-01';outputDate.onchange();
+ pieces.value='450';h.el('plan-output-form').onsubmit({preventDefault});
+ assert.match(h.el('plan-output-summary').innerHTML,/Faltam para a meta<\/span><strong>1\.550/);
+ assert.match(h.el('plan-output-summary').innerHTML,/Meta diária necessária<\/span><strong>388/);
+ assert.match(h.el('plan-stock').innerHTML,/1\.550 peças no plano/);
+ pieces.value='460';h.el('plan-output-form').onsubmit({preventDefault});
+ assert.match(h.el('plan-output-summary').innerHTML,/1\.540/);
+ assert.equal((h.el('plan-output-entries').innerHTML.match(/class="plan-output-entry"/g)||[]).length,1);
+ h.el('plan-period-type').value='month';h.el('plan-period-type').onchange();
+ assert.match(h.el('plan-output-entries').innerHTML,/01\/04\/2024[\s\S]*460 peças/);
+ h.el('plan-output-entries').onclick({target:{closest:()=>({dataset:{outputDelete:'2024-04-01'}})}});
+ assert.match(h.el('plan-output-entries').innerHTML,/Nenhuma produção lançada/);
+ h.el('plan-period-type').value='week';h.el('plan-period-type').onchange();
+ assert.match(h.el('plan-stock').innerHTML,/2\.000 peças no plano/);
+});
