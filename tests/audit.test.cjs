@@ -305,6 +305,7 @@ test('sewing planner UI keeps capacity and simulations per period and restores n
  const h=harness();
  const date=h.el('plan-period-date'),type=h.el('plan-period-type');
  date.value='2026-11-11';type.value='month';
+ h.run("planToday=()=> '2026-11-11'");
  h.seed({
   parents:[{id:'x',number:'MAL-0001',invoice:'123'}],
   records:[{purchaseId:'x',materials:{malha:{kg:30}}}]
@@ -314,25 +315,25 @@ test('sewing planner UI keeps capacity and simulations per period and restores n
  assert.equal(h.el('plan-period-label').textContent,'01/11/2026 a 30/11/2026');
  assert.match(h.el('plan-stock').innerHTML,/MAL-0001[\s\S]*NF 123[\s\S]*A cortar/);
  const preventDefault=()=>{};
- h.el('plan-daily').value='400';h.el('plan-days').value='20';
+ h.el('plan-daily').value='400';
  h.el('plan-capacity-form').onsubmit({preventDefault});
  h.el('plan-stock').onsubmit({preventDefault,target:{closest:()=>({dataset:{planEstimate:'x'},querySelector:()=>({value:'8400'})})}});
  h.el('plan-add-all').onclick();
- assert.match(h.el('plan-stock').innerHTML,/8\.000 peças no plano/);
- assert.match(h.el('plan-stock').innerHTML,/400 ficam fora da capacidade/);
+ assert.match(h.el('plan-stock').innerHTML,/5\.200 peças no plano/);
+ assert.match(h.el('plan-stock').innerHTML,/3\.200 ficam fora da capacidade/);
  type.value='week';type.onchange();
  assert.equal(h.el('plan-period-label').textContent,'09/11/2026 a 15/11/2026');
- assert.equal(h.el('plan-days').value,5);
- assert.doesNotMatch(h.el('plan-stock').innerHTML,/8\.000 peças no plano/);
+ assert.match(h.el('plan-output-summary').innerHTML,/Dias de produção restantes<\/span><strong>3/);
+ assert.doesNotMatch(h.el('plan-stock').innerHTML,/5\.200 peças no plano/);
  type.value='month';type.onchange();
- assert.match(h.el('plan-stock').innerHTML,/8\.000 peças no plano/);
+ assert.match(h.el('plan-stock').innerHTML,/5\.200 peças no plano/);
  h.run('showCutPage()');
  assert.equal(h.el('page-planejamento').style.display,'none');
 });
 
 test('daily sewing progress carries a surplus or shortfall into the remaining target',()=>{
  const h=harness();
- const progress=pieces=>JSON.parse(h.run(`JSON.stringify(sewingProgress({daily:400,days:5},[['2024-04-01',${pieces}]]))`));
+ const progress=pieces=>JSON.parse(h.run(`JSON.stringify(sewingProgress({daily:400,days:5},[['2024-04-01',${pieces}]],productionDates(planPeriod('week','2024-04-01')), '2024-04-01'))`));
  assert.deepEqual(progress(450),{produced:450,daysLeft:4,targetLeft:1550,budget:1550,gap:0});
  assert.deepEqual(progress(350),{produced:350,daysLeft:4,targetLeft:1650,budget:1600,gap:50});
  assert.deepEqual(progress(0),{produced:0,daysLeft:4,targetLeft:2000,budget:1600,gap:400});
@@ -344,9 +345,10 @@ test('saving, correcting and deleting a daily sewing total updates its week and 
  h.seed({parents:[{id:'p',number:'MAL-0001'}],cuts:[{parentId:'p',pieces:2200}]});
  h.el('plan-period-type').value='week';
  h.el('plan-period-date').value='2024-04-01';
+ h.run("planToday=()=> '2024-04-01'");
  h.run('showSewingPlan()');
  const preventDefault=()=>{};
- h.el('plan-daily').value='400';h.el('plan-days').value='5';
+ h.el('plan-daily').value='400';
  h.el('plan-capacity-form').onsubmit({preventDefault});
  h.el('plan-add-all').onclick();
  const outputDate=h.el('plan-output-date'),pieces=h.el('plan-output-pieces');
@@ -364,4 +366,32 @@ test('saving, correcting and deleting a daily sewing total updates its week and 
  assert.match(h.el('plan-output-entries').innerHTML,/Nenhuma produção lançada/);
  h.el('plan-period-type').value='week';h.el('plan-period-type').onchange();
  assert.match(h.el('plan-stock').innerHTML,/2\.000 peças no plano/);
+});
+
+test('production calendar skips elapsed dates, Sundays and holidays and supports selected work dates',()=>{
+ const h=harness();
+ h.run("planToday=()=> '2026-11-19'");
+ h.el('plan-period-type').value='week';
+ h.el('plan-period-date').value='2026-11-19';
+ h.run('showSewingPlan()');
+ assert.match(h.el('plan-calendar-list').innerHTML,/data-work-date="2026-11-20" >[\s\S]*Consciência Negra/);
+ assert.match(h.el('plan-output-summary').innerHTML,/Dias de produção restantes<\/span><strong>1/);
+ h.el('plan-calendar-saturdays').onchange({target:{checked:true}});
+ assert.match(h.el('plan-output-summary').innerHTML,/Dias de produção restantes<\/span><strong>2/);
+ h.el('plan-calendar-list').onchange({target:{closest:()=>({dataset:{workDate:'2026-11-20'},checked:true})}});
+ assert.match(h.el('plan-output-summary').innerHTML,/Dias de produção restantes<\/span><strong>3/);
+ h.el('plan-period-type').value='month';h.el('plan-period-type').onchange();
+ assert.match(h.el('plan-calendar-list').innerHTML,/data-work-date="2026-11-20" checked/);
+ assert.match(h.el('plan-calendar-list').innerHTML,/data-work-date="2026-11-21" checked/);
+ h.run("planToday=()=> '2026-12-01'; renderSewingPlan()");
+ assert.match(h.el('plan-output-summary').innerHTML,/Dias de produção restantes<\/span><strong>0/);
+});
+
+test('calendar uses Bahia local dates and the movable holidays for Feira de Santana',()=>{
+ const h=harness();
+ assert.equal(h.run("planToday(new Date('2026-11-20T02:59:59Z'))"),'2026-11-19');
+ assert.equal(h.run("planToday(new Date('2026-11-20T03:00:00Z'))"),'2026-11-20');
+ const holidays=JSON.parse(h.run('JSON.stringify(planMovableHolidays(2026))'));
+ assert.deepEqual(holidays,{'2026-04-03':'Sexta-feira da Paixão','2026-06-04':'Corpus Christi'});
+ assert.equal(h.run("productionDates(planPeriod('week','2026-07-02')).find(day=>day.date==='2026-07-02').working"),false);
 });
