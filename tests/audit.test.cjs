@@ -303,8 +303,8 @@ test('sewing stock counts receipts, cuts and post-sewing pieces once and adjusts
 
 test('sewing planner UI keeps capacity and simulations per period and restores navigation',()=>{
  const h=harness();
- const date=h.el('plan-period-date'),type=h.el('plan-period-type');
- date.value='2026-11-11';type.value='month';
+ const date=h.el('plan-query-start');
+ date.value='2026-11-11';
  h.run("planToday=()=> '2026-11-11'");
  h.seed({
   parents:[{id:'x',number:'MAL-0001',invoice:'123'}],
@@ -313,7 +313,7 @@ test('sewing planner UI keeps capacity and simulations per period and restores n
  h.run('showSewingPlan()');
  assert.equal(h.el('page-planejamento').style.display,'block');
  assert.equal(h.el('plan-period-label').textContent,'01/11/2026 a 30/11/2026');
- assert.match(h.el('plan-stock').innerHTML,/MAL-0001[\s\S]*NF 123[\s\S]*A cortar/);
+ assert.match(h.el('plan-stock').innerHTML,/MAL-0001[\s\S]*NF 123[\s\S]*Sem corte registrado/);
  const preventDefault=()=>{};
  h.el('plan-daily').value='400';
  h.el('plan-capacity-form').onsubmit({preventDefault});
@@ -321,11 +321,10 @@ test('sewing planner UI keeps capacity and simulations per period and restores n
  h.el('plan-add-all').onclick();
  assert.match(h.el('plan-stock').innerHTML,/5\.200 peças no plano/);
  assert.match(h.el('plan-stock').innerHTML,/3\.200 passam para o mês seguinte/);
- type.value='week';type.onchange();
- assert.equal(h.el('plan-period-label').textContent,'09/11/2026 a 15/11/2026');
- assert.match(h.el('plan-output-summary').innerHTML,/Dias de produção restantes<\/span><strong>3/);
- assert.doesNotMatch(h.el('plan-stock').innerHTML,/5\.200 peças no plano/);
- type.value='month';type.onchange();
+ date.value='2026-12-01';date.onchange();
+ assert.equal(h.el('plan-period-label').textContent,'01/12/2026 a 31/12/2026');
+ assert.match(h.el('plan-stock').innerHTML,/3\.200 peças no plano/);
+ date.value='2026-11-11';date.onchange();
  assert.match(h.el('plan-stock').innerHTML,/5\.200 peças no plano/);
  h.run('showCutPage()');
  assert.equal(h.el('page-planejamento').style.display,'none');
@@ -333,26 +332,25 @@ test('sewing planner UI keeps capacity and simulations per period and restores n
 
 test('daily sewing progress carries a surplus or shortfall into the remaining target',()=>{
  const h=harness();
- const progress=pieces=>JSON.parse(h.run(`JSON.stringify(sewingProgress({daily:400,days:5},[['2024-04-01',${pieces}]],productionDates(planPeriod('week','2024-04-01')), '2024-04-01'))`));
+ const progress=pieces=>JSON.parse(h.run(`JSON.stringify(sewingProgress({daily:400,days:5},[['2026-11-24',${pieces}]],productionDates(planMonth('2026-11-24')), '2026-11-24'))`));
  assert.deepEqual(progress(450),{produced:450,daysLeft:4,targetLeft:1550,budget:1550,gap:0});
  assert.deepEqual(progress(350),{produced:350,daysLeft:4,targetLeft:1650,budget:1600,gap:50});
  assert.deepEqual(progress(0),{produced:0,daysLeft:4,targetLeft:2000,budget:1600,gap:400});
  assert.deepEqual(progress(2100),{produced:2100,daysLeft:4,targetLeft:0,budget:0,gap:0});
 });
 
-test('saving, correcting and deleting a daily sewing total updates its week and month',()=>{
+test('saving, correcting and deleting a daily sewing total updates the monthly plan and date filter',()=>{
  const h=harness();
  h.seed({parents:[{id:'p',number:'MAL-0001'}],cuts:[{parentId:'p',pieces:2200}]});
- h.el('plan-period-type').value='week';
- h.el('plan-period-date').value='2024-04-01';
- h.run("planToday=()=> '2024-04-01'");
+ h.el('plan-query-start').value='2026-11-24';
+ h.run("planToday=()=> '2026-11-24'");
  h.run('showSewingPlan()');
  const preventDefault=()=>{};
  h.el('plan-daily').value='400';
  h.el('plan-capacity-form').onsubmit({preventDefault});
  h.el('plan-add-all').onclick();
  const outputDate=h.el('plan-output-date'),pieces=h.el('plan-output-pieces');
- outputDate.value='2024-04-01';outputDate.onchange();
+ outputDate.value='2026-11-24';outputDate.onchange();
  pieces.value='450';h.el('plan-output-form').onsubmit({preventDefault});
  assert.match(h.el('plan-output-summary').innerHTML,/Faltam para a meta<\/span><strong>1\.550/);
  assert.match(h.el('plan-output-summary').innerHTML,/Meta diária necessária<\/span><strong>388/);
@@ -360,27 +358,23 @@ test('saving, correcting and deleting a daily sewing total updates its week and 
  pieces.value='460';h.el('plan-output-form').onsubmit({preventDefault});
  assert.match(h.el('plan-output-summary').innerHTML,/1\.540/);
  assert.equal((h.el('plan-output-entries').innerHTML.match(/class="plan-output-entry"/g)||[]).length,1);
- h.el('plan-period-type').value='month';h.el('plan-period-type').onchange();
- assert.match(h.el('plan-output-entries').innerHTML,/01\/04\/2024[\s\S]*460 peças/);
- h.el('plan-output-entries').onclick({target:{closest:()=>({dataset:{outputDelete:'2024-04-01'}})}});
+ assert.match(h.el('plan-output-entries').innerHTML,/24\/11\/2026[\s\S]*460 peças/);
+ h.el('plan-output-entries').onclick({target:{closest:()=>({dataset:{outputDelete:'2026-11-24'}})}});
  assert.match(h.el('plan-output-entries').innerHTML,/Nenhuma produção lançada/);
- h.el('plan-period-type').value='week';h.el('plan-period-type').onchange();
  assert.match(h.el('plan-stock').innerHTML,/2\.000 peças no plano/);
 });
 
 test('production calendar skips elapsed dates, Sundays and holidays and supports selected work dates',()=>{
  const h=harness();
  h.run("planToday=()=> '2026-11-19'");
- h.el('plan-period-type').value='week';
- h.el('plan-period-date').value='2026-11-19';
+ h.el('plan-query-start').value='2026-11-19';
  h.run('showSewingPlan()');
  assert.match(h.el('plan-calendar-list').innerHTML,/data-work-date="2026-11-20" >[\s\S]*Consciência Negra/);
- assert.match(h.el('plan-output-summary').innerHTML,/Dias de produção restantes<\/span><strong>1/);
+ assert.match(h.el('plan-output-summary').innerHTML,/Dias de produção restantes<\/span><strong>7/);
  h.el('plan-calendar-saturdays').onchange({target:{checked:true}});
- assert.match(h.el('plan-output-summary').innerHTML,/Dias de produção restantes<\/span><strong>2/);
+ assert.match(h.el('plan-output-summary').innerHTML,/Dias de produção restantes<\/span><strong>9/);
  h.el('plan-calendar-list').onchange({target:{closest:()=>({dataset:{workDate:'2026-11-20'},checked:true})}});
- assert.match(h.el('plan-output-summary').innerHTML,/Dias de produção restantes<\/span><strong>3/);
- h.el('plan-period-type').value='month';h.el('plan-period-type').onchange();
+ assert.match(h.el('plan-output-summary').innerHTML,/Dias de produção restantes<\/span><strong>10/);
  assert.match(h.el('plan-calendar-list').innerHTML,/data-work-date="2026-11-20" checked/);
  assert.match(h.el('plan-calendar-list').innerHTML,/data-work-date="2026-11-21" checked/);
  h.run("planToday=()=> '2026-12-01'; renderSewingPlan()");
@@ -393,14 +387,13 @@ test('calendar uses Bahia local dates and the movable holidays for Feira de Sant
  assert.equal(h.run("planToday(new Date('2026-11-20T03:00:00Z'))"),'2026-11-20');
  const holidays=JSON.parse(h.run('JSON.stringify(planMovableHolidays(2026))'));
  assert.deepEqual(holidays,{'2026-04-03':'Sexta-feira da Paixão','2026-06-04':'Corpus Christi'});
- assert.equal(h.run("productionDates(planPeriod('week','2026-07-02')).find(day=>day.date==='2026-07-02').working"),false);
+ assert.equal(h.run("productionDates(planMonth('2026-07-02')).find(day=>day.date==='2026-07-02').working"),false);
 });
 
 test('monthly target and queue only count remaining production dates and update when a holiday is selected',()=>{
  const h=harness();
  h.run("planToday=()=> '2026-11-11'");
- h.el('plan-period-type').value='month';
- h.el('plan-period-date').value='2026-11-11';
+ h.el('plan-query-start').value='2026-11-11';
  h.run('showSewingPlan()');
  h.el('plan-daily').value='400';
  h.el('plan-capacity-form').onsubmit({preventDefault(){}});
@@ -427,7 +420,7 @@ test('monthly overflow follows the queue across several months without allocatin
   'month:2026-12-01':{daily:5,queue:['second','first']},
   'month:2027-01-01':{daily:100,queue:['first','second']}
  }))`);
- const project=()=>JSON.parse(h.run(`JSON.stringify([...projectSewingMonths(planPeriod('month','2026-11-01'),planPeriod('month','2027-02-01'),planToday()).values()].map(month=>({
+ const project=()=>JSON.parse(h.run(`JSON.stringify([...projectSewingMonths(planMonth('2026-11-01'),planMonth('2027-02-01'),planToday()).values()].map(month=>({
   selected:[...month.allocation.selected].map(([id,lot])=>[id,lot.ready,lot.outside]),
   carried:[...month.carried],capacity:month.allocation.capacity
  })))`));
@@ -450,8 +443,7 @@ test('future months can be opened and show inherited estimated pieces and capaci
   parents:[{id:'x',number:'MAL-0001',invoice:'123'}],
   records:[{purchaseId:'x',materials:{malha:{kg:100}}}]
  });
- h.el('plan-period-type').value='month';
- h.el('plan-period-date').value='2026-11-30';
+ h.el('plan-query-start').value='2026-11-30';
  h.run('showSewingPlan()');
  const preventDefault=()=>{};
  h.el('plan-daily').value='100';
@@ -459,27 +451,25 @@ test('future months can be opened and show inherited estimated pieces and capaci
  h.el('plan-stock').onsubmit({preventDefault,target:{closest:()=>({dataset:{planEstimate:'x'},querySelector:()=>({value:'260'})})}});
  h.el('plan-add-all').onclick();
  assert.match(h.el('plan-stock').innerHTML,/160 passam para o mês seguinte/);
- h.el('plan-query').open=true;
- h.el('plan-query-type').value='next';
- h.el('plan-query').ontoggle();
+ const start=h.el('plan-query-start'),end=h.el('plan-query-end');
+ start.value='2026-12-01';end.value='2026-12-31';start.onchange();
  const result=h.el('plan-query-result').innerHTML;
  assert.match(result,/01\/12\/2026 a 31\/12\/2026/);
  assert.match(result,/Capacidade disponível<\/span><strong>2\.200/);
  assert.match(result,/Programadas para costura<\/span><strong>160/);
  assert.match(result,/MAL-0001[\s\S]*>60<\/td>/);
- h.el('plan-month-nav').onclick({target:{closest:()=>({dataset:{planMonthStep:'1'}})}});
+ assert.doesNotMatch(result,/A cortar|Cortadas/);
  assert.equal(h.el('plan-daily').value,100);
  assert.match(h.el('plan-stock').innerHTML,/160 peças no plano[\s\S]*Saldo de meses anteriores/);
  assert.doesNotMatch(h.el('plan-stock').innerHTML,/Incluir na fila/);
- h.el('plan-month-nav').onclick({target:{closest:()=>({dataset:{planMonthStep:'1'}})}});
- assert.equal(h.el('plan-period-date').value,'2027-01-01');
+ start.value='2027-01-01';end.value='';start.onchange();
  assert.match(h.el('plan-stock').innerHTML,/260 peças programadas em meses anteriores/);
  h.run("planToday=()=> '2026-12-01'; renderSewingPlan()");
  assert.match(h.el('plan-stock').innerHTML,/260 peças programadas em meses anteriores/);
  assert.equal(h.run("loadPlans()['month:2026-12-01']"),undefined);
 });
 
-test('consulting a day or week uses the same monthly priority, including dates before the selected range',()=>{
+test('date filters display monthly production immediately for one date or an inclusive range',()=>{
  const h=harness();
  h.run("planToday=()=> '2026-11-16'");
  h.seed({
@@ -488,30 +478,21 @@ test('consulting a day or week uses the same monthly priority, including dates b
   lots:[{parentId:'a',brand:'Camiseta A',quantity:130,status:'Corte'}]
  });
  h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:100,queue:['a','b']}}))`);
- h.el('plan-period-date').value='2026-11-18';
- h.el('plan-period-type').value='month';
  h.run('showSewingPlan()');
- assert.equal(h.el('plan-query-result').innerHTML,'');
- h.el('plan-period-type').value='week';
- h.el('plan-period-type').onchange();
- const result=h.el('plan-query-result');
- assert.equal(h.el('plan-query').open,true);
- assert.match(result.innerHTML,/16\/11\/2026 a 22\/11\/2026/);
- assert.match(result.innerHTML,/Programadas para costura<\/span><strong>400/);
- assert.match(result.innerHTML,/MAL-0001[\s\S]*Camiseta A/);
- assert.match(result.innerHTML,/MAL-0002/);
- assert.doesNotMatch(result.innerHTML,/scope="rowgroup" rowspan="\d+">20\/11\/2026/);
- h.el('plan-query-type').value='day';
- h.el('plan-query-type').onchange();
- assert.match(result.innerHTML,/18\/11\/2026 a 18\/11\/2026/);
+ const result=h.el('plan-query-result'),start=h.el('plan-query-start'),end=h.el('plan-query-end');
+ assert.equal(result.innerHTML,'');
+ start.value='2026-11-18';start.onchange();
+ assert.match(result.innerHTML,/18\/11\/2026<\/strong>/);
  assert.match(result.innerHTML,/Programadas para costura<\/span><strong>100/);
  assert.doesNotMatch(result.innerHTML,/MAL-0001/);
- h.el('plan-query-start').value='2026-11-17';
- h.el('plan-query-start').onchange();
- assert.equal(h.el('plan-query-type').value,'range');
- assert.match(result.innerHTML,/Programadas para costura<\/span><strong>200/);
+ start.value='2026-11-17';start.onchange();
+ end.value='2026-11-22';end.onchange();
+ assert.match(result.innerHTML,/17\/11\/2026 a 22\/11\/2026/);
+ assert.match(result.innerHTML,/Programadas para costura<\/span><strong>300/);
  assert.match(result.innerHTML,/MAL-0001[\s\S]*>30<\/td>/);
- h.el('plan-query-end').value='2026-11-16';
- h.el('plan-query-end').onchange();
- assert.match(result.innerHTML,/Informe as duas datas em ordem/);
+ assert.doesNotMatch(result.innerHTML,/scope="rowgroup" rowspan="\d+">20\/11\/2026/);
+ end.value='2026-11-16';end.onchange();
+ assert.match(result.innerHTML,/Informe uma data inicial válida/);
+ start.value='';start.onchange();
+ assert.equal(result.innerHTML,'');
 });
