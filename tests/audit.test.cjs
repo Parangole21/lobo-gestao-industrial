@@ -320,7 +320,7 @@ test('sewing planner UI keeps capacity and simulations per period and restores n
  h.el('plan-stock').onsubmit({preventDefault,target:{closest:()=>({dataset:{planEstimate:'x'},querySelector:()=>({value:'8400'})})}});
  h.el('plan-add-all').onclick();
  assert.match(h.el('plan-stock').innerHTML,/5\.200 peças no plano/);
- assert.match(h.el('plan-stock').innerHTML,/3\.200 ficam fora da capacidade/);
+ assert.match(h.el('plan-stock').innerHTML,/3\.200 passam para o mês seguinte/);
  type.value='week';type.onchange();
  assert.equal(h.el('plan-period-label').textContent,'09/11/2026 a 15/11/2026');
  assert.match(h.el('plan-output-summary').innerHTML,/Dias de produção restantes<\/span><strong>3/);
@@ -413,4 +413,61 @@ test('monthly target and queue only count remaining production dates and update 
  h.el('plan-output-form').onsubmit({preventDefault(){}});
  assert.match(h.el('plan-capacity').innerHTML,/5\.200<\/strong><span>400 peças\/dia × 13 dias/);
  assert.match(h.el('plan-output-summary').innerHTML,/Faltam para a meta<\/span><strong>5\.150/);
+});
+
+test('monthly overflow follows the queue across several months without allocating the same stock twice',()=>{
+ const h=harness();
+ h.run("planToday=()=> '2026-11-30'");
+ h.seed({
+  parents:[{id:'first',number:'MAL-0001'},{id:'second',number:'MAL-0002'}],
+  cuts:[{parentId:'first',pieces:250},{parentId:'second',pieces:50}]
+ });
+ h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({
+  'month:2026-11-01':{daily:100,queue:['first']},
+  'month:2026-12-01':{daily:5,queue:['second','first']},
+  'month:2027-01-01':{daily:100,queue:['first','second']}
+ }))`);
+ const project=()=>JSON.parse(h.run(`JSON.stringify([...projectSewingMonths(planPeriod('month','2026-11-01'),planPeriod('month','2027-02-01'),planToday()).values()].map(month=>({
+  selected:[...month.allocation.selected].map(([id,lot])=>[id,lot.ready,lot.outside]),
+  carried:[...month.carried],capacity:month.allocation.capacity
+ })))`));
+ let [nov,dec,jan,feb]=project();
+ assert.deepEqual(nov.selected,[['first',100,150]]);
+ assert.deepEqual(dec.selected,[['first',110,40],['second',0,50]]);
+ assert.deepEqual(dec.carried,['first']);
+ assert.deepEqual(jan.selected,[['first',40,0],['second',50,0]]);
+ assert.deepEqual(feb.selected,[]);
+ h.run(`localStorage.setItem(planStorageKey()+':calendario',JSON.stringify({'2026-12-25':true}))`);
+ [,dec,jan]=project();
+ assert.equal(dec.capacity,115);
+ assert.deepEqual(jan.selected,[['first',35,0],['second',50,0]]);
+});
+
+test('future months can be opened and show inherited estimated pieces and capacity',()=>{
+ const h=harness();
+ h.run("planToday=()=> '2026-11-30'");
+ h.seed({
+  parents:[{id:'x',number:'MAL-0001',invoice:'123'}],
+  records:[{purchaseId:'x',materials:{malha:{kg:100}}}]
+ });
+ h.el('plan-period-type').value='month';
+ h.el('plan-period-date').value='2026-11-30';
+ h.run('showSewingPlan()');
+ const preventDefault=()=>{};
+ h.el('plan-daily').value='100';
+ h.el('plan-capacity-form').onsubmit({preventDefault});
+ h.el('plan-stock').onsubmit({preventDefault,target:{closest:()=>({dataset:{planEstimate:'x'},querySelector:()=>({value:'260'})})}});
+ h.el('plan-add-all').onclick();
+ assert.match(h.el('plan-stock').innerHTML,/160 passam para o mês seguinte/);
+ assert.match(h.el('plan-upcoming-list').innerHTML,/dezembro de 2026[\s\S]*Capacidade<\/dt><dd>2\.200<\/dd>[\s\S]*Programadas<\/dt><dd>160/);
+ h.el('plan-upcoming-list').onclick({target:{closest:()=>({dataset:{planOpenMonth:'2026-12-01'}})}});
+ assert.equal(h.el('plan-daily').value,100);
+ assert.match(h.el('plan-stock').innerHTML,/160 peças no plano[\s\S]*Saldo de meses anteriores/);
+ assert.doesNotMatch(h.el('plan-stock').innerHTML,/Incluir na fila/);
+ h.el('plan-month-nav').onclick({target:{closest:()=>({dataset:{planMonthStep:'1'}})}});
+ assert.equal(h.el('plan-period-date').value,'2027-01-01');
+ assert.match(h.el('plan-stock').innerHTML,/260 peças programadas em meses anteriores/);
+ h.run("planToday=()=> '2026-12-01'; renderSewingPlan()");
+ assert.match(h.el('plan-stock').innerHTML,/260 peças programadas em meses anteriores/);
+ assert.equal(h.run("loadPlans()['month:2026-12-01']"),undefined);
 });

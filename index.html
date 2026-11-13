@@ -69,7 +69,18 @@
 .plan-calendar-day{display:flex;align-items:flex-start;gap:8px;margin:0;padding:7px 8px;border-radius:6px;background:#f3f7fb;color:#244863}
 .plan-calendar-day input{width:auto;margin:2px 0 0;accent-color:#2563a6}
 .plan-calendar-day small{display:block;font-size:11px;color:#48627c}
-</style></head><body class="auth-locked"><div class="app"><aside><h2>LOBO <span style="font-weight:400">Industrial</span></h2><p>Gestão de produção • v109</p><div style="font-size:12px;color:#d7e6f6;margin:0 0 14px"><button type="button" onclick="testSupabaseConnection()" style="display:none;width:100%;padding:9px;border:1px solid #6284a8;border-radius:7px;background:#254563;color:white;cursor:pointer">Verificar conexão Supabase</button><div id="supabase-connection-status" role="status" style="display:none;margin-top:7px;line-height:1.4"></div></div><div style="font-size:12px;color:#d7e6f6;margin-bottom:16px"><div id="cloud-auth-status" role="status" style="margin-top:6px">Não autenticado • dados locais preservados</div><div id="cloud-sync-controls" style="display:none;margin-top:12px"><button type="button" onclick="cloudSyncAll()" id="cloud-sync-btn" style="display:none;width:100%;padding:10px;border:1px solid #6284a8;border-radius:7px;background:#19745d;color:white;cursor:pointer">Sincronizar agora</button><div id="cloud-conflict-details" style="display:none;margin-top:10px;padding:10px;background:#20364f;border:1px solid #8fa9c5;border-radius:8px;font-size:12px;overflow-wrap:anywhere"></div><div id="lot-reconcile-result" role="status" style="display:none;margin:8px 0;padding:10px;border:1px solid #adbad0;border-radius:7px;background:#f4f7fd;color:#243654;white-space:pre-wrap;font-size:13px"></div><button id="resolve-test-lots" type="button" onclick="resolveTestLotDeletions()" style="display:none;margin-top:8px;padding:9px;border:1px solid #e3a34a;border-radius:7px;background:#fff4dc;color:#553000;cursor:pointer">Conciliar exclusão dos 3 lotes de teste</button><div id="cloud-sync-message" role="status" style="margin-top:7px;line-height:1.4"></div><div id="sync-problem-banner" role="alert"><strong>Atenção: problema de sincronização</strong><span id="sync-problem-text"></span><button type="button" onclick="dismissSyncProblem()">Fechar aviso</button></div></div></div><div class="nav active" id="nav-lotes" onclick="showPage('lotes')">▤ Lotes de produção</div><div id="lot-sidebar" style="display:none"><div class="subnav" id="lot-nav-cadastro" onclick="document.getElementById('page-materia').style.display='none';document.getElementById('page-lotes').style.display='block';document.getElementById('lot-sidebar').style.display='block';document.getElementById('lot-page-heading').textContent='Cadastro de lote principal';document.getElementById('lot-register-area').style.display='block';document.getElementById('lot-consult-content').style.display='none';document.getElementById('lot-marca-content').style.display='none';document.getElementById('lot-historico-content').style.display='none';document.getElementById('lot-consult-area').style.display='none';document.getElementById('lot-nav-cadastro').classList.add('active');document.getElementById('lot-nav-consulta').classList.remove('active');document.getElementById('lot-nav-marca').classList.remove('active');document.getElementById('lot-nav-historico').classList.remove('active');document.getElementById('nav-materia').classList.remove('active');document.getElementById('nav-lotes').classList.add('active');">Cadastro de lote</div><div class="subnav" id="lot-nav-consulta" onclick="selectedParentOnly=null;document.getElementById('lot-search').value='';renderLots();document.getElementById('page-materia').style.display='none';document.getElementById('page-lotes').style.display='block';document.getElementById('lot-sidebar').style.display='block';document.getElementById('lot-page-heading').textContent='Compras de malha cadastradas';document.getElementById('lot-register-area').style.display='none';document.getElementById('lot-consult-content').style.display='block';document.getElementById('lot-marca-content').style.display='none';document.getElementById('lot-historico-content').style.display='none';document.getElementById('lot-consult-area').style.display='block';document.getElementById('lot-nav-cadastro').classList.remove('active');document.getElementById('lot-nav-consulta').classList.add('active');document.getElementById('lot-nav-marca').classList.remove('active');document.getElementById('lot-nav-historico').classList.remove('active');document.getElementById('nav-materia').classList.remove('active');document.getElementById('nav-lotes').classList.add('active');">Buscar compras de malha</div><div class="subnav" id="lot-nav-marca" onclick="showLotView('marca')">Adicionar marca / previsão</div><div class="subnav" id="lot-nav-historico" onclick="document.getElementById('page-materia').style.display='none';document.getElementById('page-lotes').style.display='block';document.getElementById('lot-sidebar').style.display='block';document.getElementById('lot-page-heading').textContent='Histórico de movimentações';document.getElementById('lot-register-area').style.display='none';document.getElementById('lot-consult-content').style.display='none';document.getElementById('lot-marca-content').style.display='none';document.getElementById('lot-historico-content').style.display='block';document.getElementById('lot-consult-area').style.display='none';document.getElementById('lot-nav-cadastro').classList.remove('active');document.getElementById('lot-nav-consulta').classList.remove('active');document.getElementById('lot-nav-marca').classList.remove('active');document.getElementById('lot-nav-historico').classList.add('active');document.getElementById('nav-materia').classList.remove('active');document.getElementById('nav-lotes').classList.add('active');">Histórico de movimentações</div></div><div class="nav" id="nav-materia" onclick="showPage('materia')">▣ Matéria-prima</div><div class="nav" id="nav-corte" onclick="showCutPage()">✂ Controle de corte</div><div class="nav" id="nav-custos" onclick="showCostPage()">◫ Custos individuais</div><button class="nav plan-nav" type="button" id="nav-planejamento" onclick="showSewingPlan()">▦ Planejamento de costura</button><div class="nav" id="nav-indicadores" onclick="showIndicators()">▥ Indicadores</div><div class="nav lock">⚙ Processos • em desenvolvimento</div><button id="cloud-logout" type="button" onclick="cloudLogout()">Sair da conta</button></aside><main><div id="page-materia"><h1>Recebimento de matéria-prima</h1><p class="sub">Cadastre cada recebimento com as quantidades e o valor total da nota fiscal.</p><section class="stats"><div class="stat"><span>Recebimentos registrados</span><strong id="n">0</strong></div><div class="stat"><span>Kg de malha recebidos</span><strong id="kg">0</strong></div><div class="stat"><span>Valor registrado</span><strong id="sum">R$ 0,00</strong></div></section><section class="panel"><h3 id="formtitle">Novo recebimento</h3><form id="form"><div class="fields"><div><label>Data de recebimento *</label><input type="date" id="date" required></div><div class="full"><label>Compra de malha vinculada *</label><select id="receipt-purchase" required><option value="">Selecione a compra cadastrada</option></select><p class="hint">Vincule o recebimento à compra de malha. Para corrigir uma entrada, edite o recebimento existente.</p></div><div><label>Fornecedor *</label><input id="supplier" placeholder="Nome do fornecedor" list="suppliers" required><datalist id="suppliers"></datalist></div><div><label>Tipo de malha *</label><input id="fabric" placeholder="Ex.: Piquet elastano" list="fabrics" required><datalist id="fabrics"></datalist></div><div><label>Nº da nota fiscal (opcional)</label><input id="invoice" placeholder="Número da NF"></div></div><h3 style="margin:24px 0 8px;font-size:16px">Quantidades recebidas</h3><div class="fields"><div><label>Malha (kg)</label><input type="number" step="0.001" min="0" id="malhakg" placeholder="0"></div><div><label>Gola e punho (kg)</label><input type="number" step="0.001" min="0" id="golakg" placeholder="0"></div><div><label>Ribana (kg)</label><input type="number" step="0.001" min="0" id="ribanakg" placeholder="0"></div><div><label>Valor total da nota fiscal (R$) *</label><input type="number" step="0.01" min="0" id="invoiceTotal" placeholder="0,00" required></div></div><p class="hint">Informe apenas as quantidades e o valor total da nota. Não é necessário lançar preços individuais.</p><div class="fields" style="margin-top:18px"><div class="full"><label>Observações</label><textarea id="notes" placeholder="Informações adicionais sobre o recebimento"></textarea></div></div><div class="row" style="justify-content:space-between;margin-top:17px"><div>Valor total da nota: <span class="total" id="preview">R$ 0,00</span></div><div class="row"><button class="btn secondary" type="button" id="reset">Limpar</button><button class="btn" type="submit" id="save">Salvar recebimento</button></div></div></form></section><section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:15px"><h3 style="margin:0">Histórico de recebimentos</h3><div class="row"><button class="btn secondary" id="export" type="button">Exportar backup JSON</button><label class="btn secondary" style="cursor:pointer;margin:0">Importar backup<input type="file" id="import" accept="application/json" hidden></label></div></div><input id="search" placeholder="Buscar fornecedor, malha ou nota fiscal" style="margin-bottom:14px"><div class="tablewrap"><table><thead><tr><th>Data</th><th>Fornecedor</th><th>Tipo de malha</th><th>NF</th><th>Malha (kg)</th><th>Total</th><th>Ações</th></tr></thead><tbody id="rows"></tbody></table></div></section></div><section id="page-planejamento" class="sew-plan" style="display:none" aria-labelledby="plan-heading">
+.plan-month-nav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.plan-month-nav[hidden]{display:none}
+.plan-month-nav .btn{font-size:13px;padding:6px 10px}
+.plan-upcoming{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.plan-month-card{padding:12px;border:1px solid #dce5f0;border-radius:9px;background:#f9fbfe}
+.plan-month-card .btn{padding:5px 8px;text-transform:capitalize}
+.plan-month-card dl{display:grid;gap:5px;margin:10px 0;font-size:14px}
+.plan-month-card dl div{display:flex;justify-content:space-between;gap:6px}
+.plan-month-card dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+.plan-month-card p{margin:5px 0 0;color:#3e5670;font-size:13px}
+.plan-month-card .plan-wait{color:#894009}
+</style></head><body class="auth-locked"><div class="app"><aside><h2>LOBO <span style="font-weight:400">Industrial</span></h2><p>Gestão de produção • v110</p><div style="font-size:12px;color:#d7e6f6;margin:0 0 14px"><button type="button" onclick="testSupabaseConnection()" style="display:none;width:100%;padding:9px;border:1px solid #6284a8;border-radius:7px;background:#254563;color:white;cursor:pointer">Verificar conexão Supabase</button><div id="supabase-connection-status" role="status" style="display:none;margin-top:7px;line-height:1.4"></div></div><div style="font-size:12px;color:#d7e6f6;margin-bottom:16px"><div id="cloud-auth-status" role="status" style="margin-top:6px">Não autenticado • dados locais preservados</div><div id="cloud-sync-controls" style="display:none;margin-top:12px"><button type="button" onclick="cloudSyncAll()" id="cloud-sync-btn" style="display:none;width:100%;padding:10px;border:1px solid #6284a8;border-radius:7px;background:#19745d;color:white;cursor:pointer">Sincronizar agora</button><div id="cloud-conflict-details" style="display:none;margin-top:10px;padding:10px;background:#20364f;border:1px solid #8fa9c5;border-radius:8px;font-size:12px;overflow-wrap:anywhere"></div><div id="lot-reconcile-result" role="status" style="display:none;margin:8px 0;padding:10px;border:1px solid #adbad0;border-radius:7px;background:#f4f7fd;color:#243654;white-space:pre-wrap;font-size:13px"></div><button id="resolve-test-lots" type="button" onclick="resolveTestLotDeletions()" style="display:none;margin-top:8px;padding:9px;border:1px solid #e3a34a;border-radius:7px;background:#fff4dc;color:#553000;cursor:pointer">Conciliar exclusão dos 3 lotes de teste</button><div id="cloud-sync-message" role="status" style="margin-top:7px;line-height:1.4"></div><div id="sync-problem-banner" role="alert"><strong>Atenção: problema de sincronização</strong><span id="sync-problem-text"></span><button type="button" onclick="dismissSyncProblem()">Fechar aviso</button></div></div></div><div class="nav active" id="nav-lotes" onclick="showPage('lotes')">▤ Lotes de produção</div><div id="lot-sidebar" style="display:none"><div class="subnav" id="lot-nav-cadastro" onclick="document.getElementById('page-materia').style.display='none';document.getElementById('page-lotes').style.display='block';document.getElementById('lot-sidebar').style.display='block';document.getElementById('lot-page-heading').textContent='Cadastro de lote principal';document.getElementById('lot-register-area').style.display='block';document.getElementById('lot-consult-content').style.display='none';document.getElementById('lot-marca-content').style.display='none';document.getElementById('lot-historico-content').style.display='none';document.getElementById('lot-consult-area').style.display='none';document.getElementById('lot-nav-cadastro').classList.add('active');document.getElementById('lot-nav-consulta').classList.remove('active');document.getElementById('lot-nav-marca').classList.remove('active');document.getElementById('lot-nav-historico').classList.remove('active');document.getElementById('nav-materia').classList.remove('active');document.getElementById('nav-lotes').classList.add('active');">Cadastro de lote</div><div class="subnav" id="lot-nav-consulta" onclick="selectedParentOnly=null;document.getElementById('lot-search').value='';renderLots();document.getElementById('page-materia').style.display='none';document.getElementById('page-lotes').style.display='block';document.getElementById('lot-sidebar').style.display='block';document.getElementById('lot-page-heading').textContent='Compras de malha cadastradas';document.getElementById('lot-register-area').style.display='none';document.getElementById('lot-consult-content').style.display='block';document.getElementById('lot-marca-content').style.display='none';document.getElementById('lot-historico-content').style.display='none';document.getElementById('lot-consult-area').style.display='block';document.getElementById('lot-nav-cadastro').classList.remove('active');document.getElementById('lot-nav-consulta').classList.add('active');document.getElementById('lot-nav-marca').classList.remove('active');document.getElementById('lot-nav-historico').classList.remove('active');document.getElementById('nav-materia').classList.remove('active');document.getElementById('nav-lotes').classList.add('active');">Buscar compras de malha</div><div class="subnav" id="lot-nav-marca" onclick="showLotView('marca')">Adicionar marca / previsão</div><div class="subnav" id="lot-nav-historico" onclick="document.getElementById('page-materia').style.display='none';document.getElementById('page-lotes').style.display='block';document.getElementById('lot-sidebar').style.display='block';document.getElementById('lot-page-heading').textContent='Histórico de movimentações';document.getElementById('lot-register-area').style.display='none';document.getElementById('lot-consult-content').style.display='none';document.getElementById('lot-marca-content').style.display='none';document.getElementById('lot-historico-content').style.display='block';document.getElementById('lot-consult-area').style.display='none';document.getElementById('lot-nav-cadastro').classList.remove('active');document.getElementById('lot-nav-consulta').classList.remove('active');document.getElementById('lot-nav-marca').classList.remove('active');document.getElementById('lot-nav-historico').classList.add('active');document.getElementById('nav-materia').classList.remove('active');document.getElementById('nav-lotes').classList.add('active');">Histórico de movimentações</div></div><div class="nav" id="nav-materia" onclick="showPage('materia')">▣ Matéria-prima</div><div class="nav" id="nav-corte" onclick="showCutPage()">✂ Controle de corte</div><div class="nav" id="nav-custos" onclick="showCostPage()">◫ Custos individuais</div><button class="nav plan-nav" type="button" id="nav-planejamento" onclick="showSewingPlan()">▦ Planejamento de costura</button><div class="nav" id="nav-indicadores" onclick="showIndicators()">▥ Indicadores</div><div class="nav lock">⚙ Processos • em desenvolvimento</div><button id="cloud-logout" type="button" onclick="cloudLogout()">Sair da conta</button></aside><main><div id="page-materia"><h1>Recebimento de matéria-prima</h1><p class="sub">Cadastre cada recebimento com as quantidades e o valor total da nota fiscal.</p><section class="stats"><div class="stat"><span>Recebimentos registrados</span><strong id="n">0</strong></div><div class="stat"><span>Kg de malha recebidos</span><strong id="kg">0</strong></div><div class="stat"><span>Valor registrado</span><strong id="sum">R$ 0,00</strong></div></section><section class="panel"><h3 id="formtitle">Novo recebimento</h3><form id="form"><div class="fields"><div><label>Data de recebimento *</label><input type="date" id="date" required></div><div class="full"><label>Compra de malha vinculada *</label><select id="receipt-purchase" required><option value="">Selecione a compra cadastrada</option></select><p class="hint">Vincule o recebimento à compra de malha. Para corrigir uma entrada, edite o recebimento existente.</p></div><div><label>Fornecedor *</label><input id="supplier" placeholder="Nome do fornecedor" list="suppliers" required><datalist id="suppliers"></datalist></div><div><label>Tipo de malha *</label><input id="fabric" placeholder="Ex.: Piquet elastano" list="fabrics" required><datalist id="fabrics"></datalist></div><div><label>Nº da nota fiscal (opcional)</label><input id="invoice" placeholder="Número da NF"></div></div><h3 style="margin:24px 0 8px;font-size:16px">Quantidades recebidas</h3><div class="fields"><div><label>Malha (kg)</label><input type="number" step="0.001" min="0" id="malhakg" placeholder="0"></div><div><label>Gola e punho (kg)</label><input type="number" step="0.001" min="0" id="golakg" placeholder="0"></div><div><label>Ribana (kg)</label><input type="number" step="0.001" min="0" id="ribanakg" placeholder="0"></div><div><label>Valor total da nota fiscal (R$) *</label><input type="number" step="0.01" min="0" id="invoiceTotal" placeholder="0,00" required></div></div><p class="hint">Informe apenas as quantidades e o valor total da nota. Não é necessário lançar preços individuais.</p><div class="fields" style="margin-top:18px"><div class="full"><label>Observações</label><textarea id="notes" placeholder="Informações adicionais sobre o recebimento"></textarea></div></div><div class="row" style="justify-content:space-between;margin-top:17px"><div>Valor total da nota: <span class="total" id="preview">R$ 0,00</span></div><div class="row"><button class="btn secondary" type="button" id="reset">Limpar</button><button class="btn" type="submit" id="save">Salvar recebimento</button></div></div></form></section><section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:15px"><h3 style="margin:0">Histórico de recebimentos</h3><div class="row"><button class="btn secondary" id="export" type="button">Exportar backup JSON</button><label class="btn secondary" style="cursor:pointer;margin:0">Importar backup<input type="file" id="import" accept="application/json" hidden></label></div></div><input id="search" placeholder="Buscar fornecedor, malha ou nota fiscal" style="margin-bottom:14px"><div class="tablewrap"><table><thead><tr><th>Data</th><th>Fornecedor</th><th>Tipo de malha</th><th>NF</th><th>Malha (kg)</th><th>Total</th><th>Ações</th></tr></thead><tbody id="rows"></tbody></table></div></section></div><section id="page-planejamento" class="sew-plan" style="display:none" aria-labelledby="plan-heading">
  <header class="plan-hero">
   <h1 id="plan-heading">Planejamento de costura</h1>
   <p>Organize a fila de lotes conforme o estoque e a capacidade do período.</p>
@@ -81,6 +92,10 @@
   <div class="plan-fields plan-period-fields">
    <label>Planejar por<select id="plan-period-type"><option value="month">Mês</option><option value="week">Semana</option></select></label>
    <label>Data de referência<input id="plan-period-date" type="date" required></label>
+  </div>
+  <div id="plan-month-nav" class="plan-month-nav" hidden>
+   <button class="btn secondary" type="button" data-plan-month-step="-1">‹ Mês anterior</button>
+   <button class="btn secondary" type="button" data-plan-month-step="1">Próximo mês ›</button>
   </div>
   <form id="plan-capacity-form" class="plan-fields">
    <label>Meta diária em peças<input id="plan-daily" type="number" min="0" max="100000000" step="1" inputmode="numeric" required placeholder="Ex. 400"></label>
@@ -95,6 +110,12 @@
   </details>
   <div id="plan-capacity" class="plan-metrics"></div>
   <p class="plan-message" id="plan-message" role="status"></p>
+ </section>
+ <section class="panel plan-panel" aria-labelledby="plan-upcoming-heading">
+  <div class="plan-section-head"><div><h2 id="plan-upcoming-heading">Próximos meses</h2>
+   <p class="hint">O saldo da fila mensal tem prioridade no mês seguinte. Até você salvar outra meta diária, vale a última meta mensal salva.</p>
+  </div></div>
+  <div id="plan-upcoming-list" class="plan-upcoming"></div>
  </section>
  <section class="panel plan-panel" aria-labelledby="plan-output-heading">
   <div class="plan-section-head"><div><h2 id="plan-output-heading">Produção realizada</h2><p class="hint">Informe o total costurado em cada dia. O mesmo lançamento entra na semana e no mês da data.</p></div></div>
@@ -1186,18 +1207,22 @@ $('plan-calendar-list').onchange=event=>{
 function loadPlans(){
  try{return JSON.parse(localStorage.getItem(planStorageKey())||'{}')||{}}catch(error){return {}}
 }
-function loadPlan(period,dates=productionDates(period)){
- const saved=loadPlans()[period.key];
+function loadPlan(period,dates=productionDates(period),plans=loadPlans()){
+ const saved=plans[period.key];
+ const inherited=period.key.startsWith('month:')&&saved?.daily===undefined
+  ?Object.keys(plans).filter(key=>key.startsWith('month:')&&key<period.key&&plans[key]?.daily!==undefined).sort().pop():null;
  return {
-  daily:planInteger(saved?.daily,PLAN_MAX_PIECES),
+  daily:planInteger(saved?.daily??plans[inherited]?.daily,PLAN_MAX_PIECES),
   days:dates.filter(day=>day.working).length,
   queue:Array.isArray(saved?.queue)?saved.queue:[],
   estimates:saved?.estimates||{}
  };
 }
-function savePlan(period,plan,message){
+function savePlan(period,plan,message,saveGoal=false){
  try{
-  localStorage.setItem(planStorageKey(),JSON.stringify({...loadPlans(),[period.key]:plan}));
+  const plans=loadPlans();
+  const saved={...plan,daily:saveGoal?plan.daily:plans[period.key]?.daily};
+  localStorage.setItem(planStorageKey(),JSON.stringify({...plans,[period.key]:saved}));
   $('plan-message').textContent=message;
   return true;
  }catch(error){
@@ -1282,7 +1307,7 @@ function allocateSewing(plan,stock,capacity=plan.daily*plan.days){
  }
  return {capacity,free,overflow,ready,estimate,selected};
 }
-function renderPlanStockRow(row,allocation,queue){
+function renderPlanStockRow(row,allocation,queue,monthly,carried=false,original=row){
  const id=esc(row.purchase.id),code=esc(row.purchase.number||'Lote');
  const index=queue.indexOf(row.purchase.id);
  const hasUncut=row.uncutKg>0.000001;
@@ -1290,7 +1315,7 @@ function renderPlanStockRow(row,allocation,queue){
  const lines=allocation?.lines||row.lines;
  return `<article class="plan-row" data-queued="${Boolean(allocation)}" data-plan-row="${id}">
   <div>
-   <h3>${allocation?num(index+1)+'. ':''}${code}</h3>
+   <h3>${allocation&&index>=0?num(index+1)+'. ':''}${code}</h3>
    <p>${row.invoices.length?'NF '+row.invoices.map(esc).join(' · '):'NF não informada'}</p>
    <p>${esc(row.purchase.fabricBrand||'Malha')}</p>
    <span class="plan-status" data-ready="${row.cut>0&&!hasUncut}">${status}</span>
@@ -1300,9 +1325,10 @@ function renderPlanStockRow(row,allocation,queue){
    ${hasUncut?`<p>${num(row.uncutKg)} kg recebidos a cortar</p>
     <form class="plan-estimate" data-plan-estimate="${id}">
      <label for="plan-estimate-${id}">Peças estimadas para o saldo em kg</label>
-     <div><input id="plan-estimate-${id}" type="number" min="0" max="${PLAN_MAX_PIECES}" step="1" inputmode="numeric" placeholder="0" value="${row.estimate||''}">
+     <div><input id="plan-estimate-${id}" type="number" min="0" max="${PLAN_MAX_PIECES}" step="1" inputmode="numeric" placeholder="0" value="${original.estimate||''}">
      <button class="btn secondary" type="submit">Aplicar</button></div>
     </form>`:''}
+   ${row.ready+row.estimate<original.ready+original.estimate?`<p>${num(original.ready+original.estimate-row.ready-row.estimate)} peças programadas em meses anteriores</p>`:''}
    ${lines.length?`<details class="plan-breakdown"><summary>Peças por marca e modelo</summary><ul>${lines.map(line=>`<li><strong>${esc(line.label)}</strong>
     <p>${num(line.ready)} cortadas · ${num(line.estimate)} estimadas${line.shortage?' · '+num(line.shortage)+' sem saldo identificado':''}</p>
     ${allocation?`<p>No plano: ${num(line.plannedReady)} cortadas · ${num(line.plannedEstimate)} estimadas</p>`:''}</li>`).join('')}</ul></details>`:''}
@@ -1310,10 +1336,10 @@ function renderPlanStockRow(row,allocation,queue){
   <div>
    ${allocation?`<strong>${num(allocation.ready+allocation.estimate)} peças no plano</strong>
     <p>${num(allocation.ready)} cortadas · ${num(allocation.estimate)} a cortar</p>
-    ${allocation.outside?`<p class="plan-wait">${num(allocation.outside)} ficam fora da capacidade</p>`:''}`:'<p>Fora da fila</p>'}
+    ${allocation.outside?`<p class="plan-wait">${num(allocation.outside)} ${monthly?'passam para o mês seguinte':'ficam fora da capacidade'}</p>`:''}`:'<p>Fora da fila</p>'}
   </div>
   <div class="plan-actions">
-   ${allocation?`<button class="btn secondary" type="button" data-plan-action="up" aria-label="Subir ${code} na fila" ${index===0?'disabled':''}>↑</button>
+   ${carried?'<span class="plan-status">Saldo de meses anteriores</span>':allocation?`<button class="btn secondary" type="button" data-plan-action="up" aria-label="Subir ${code} na fila" ${index===0?'disabled':''}>↑</button>
     <button class="btn secondary" type="button" data-plan-action="down" aria-label="Descer ${code} na fila" ${index===queue.length-1?'disabled':''}>↓</button>
     <button class="btn secondary" type="button" data-plan-action="remove" aria-label="Retirar ${code} da fila">Retirar</button>`
    :`<button class="btn secondary" type="button" data-plan-action="add" aria-label="Incluir ${code} na fila" ${row.ready+row.estimate===0?'disabled':''}>Incluir na fila</button>`}
@@ -1345,9 +1371,8 @@ function sewingProgress(plan,entries,dates,today){
  const targetLeft=Math.max(0,remainingCapacity+plan.daily*loggedWorkdays-produced);
  return {produced,daysLeft,targetLeft,budget:Math.min(targetLeft,remainingCapacity),gap:Math.max(0,targetLeft-remainingCapacity)};
 }
-function periodDailySewing(period){
- const today=planToday();
- return Object.entries(loadDailySewing())
+function periodDailySewing(period,entries=loadDailySewing(),today=planToday()){
+ return Object.entries(entries)
   .filter(([date,pieces])=>/^\d{4}-\d{2}-\d{2}$/.test(date)&&date>=period.start&&date<=period.end&&date<=today&&Number.isSafeInteger(pieces)&&pieces>=0&&pieces<=PLAN_MAX_PIECES)
   .sort(([a],[b])=>b.localeCompare(a));
 }
@@ -1423,12 +1448,108 @@ $('plan-output-entries').onclick=event=>{
   renderSewingPlan();
  }
 };
+const PLAN_MONTH_FORMAT=new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'});
+
+function shiftPlanMonth(period,offset){
+ const date=new Date(period.start+'T12:00:00');
+ date.setMonth(date.getMonth()+offset,1);
+ return planPeriod('month',planDateKey(date));
+}
+function planMonthName(period){
+ return PLAN_MONTH_FORMAT.format(new Date(period.start+'T12:00:00'));
+}
+function remainingMonthlyStock(row,used){
+ if(!used)return row;
+ let ready=used.ready,estimate=used.estimate;
+ const lines=row.lines.map(line=>{
+  const reservedReady=Math.min(line.ready,ready),reservedEstimate=Math.min(line.estimate,estimate);
+  ready-=reservedReady;
+  estimate-=reservedEstimate;
+  return {...line,ready:line.ready-reservedReady,estimate:line.estimate-reservedEstimate};
+ });
+ return {...row,ready:Math.max(0,row.ready-used.ready),estimate:Math.max(0,row.estimate-used.estimate),lines};
+}
+function projectSewingMonths(first,last,today){
+ const plans=loadPlans(),calendar=loadWorkCalendar(),dailyEntries=loadDailySewing();
+ const current=planPeriod('month',today);
+ const months=new Map(),used=new Map();
+ let estimates={},carry=[];
+ const savedMonths=Object.keys(plans).filter(key=>/^month:\d{4}-\d{2}-01$/.test(key)).sort();
+ const start=first.start<current.start?first:current;
+ for(const key of savedMonths.filter(key=>key<start.key)){
+  const saved=plans[key];
+  estimates={...estimates,...saved?.estimates};
+  if(Array.isArray(saved?.queue))carry=[...new Set([...carry,...saved.queue])];
+ }
+ for(let period=start;period.start<=last.start;period=shiftPlanMonth(period,1)){
+  const dates=productionDates(period,calendar);
+  const plan=loadPlan(period,dates,plans);
+  estimates={...estimates,...plan.estimates};
+  const entries=periodDailySewing(period,dailyEntries,today);
+  const progress=sewingProgress(plan,entries,dates,today);
+  const originalStock=sewingStock({...plan,estimates});
+  const stock=originalStock.map(row=>remainingMonthlyStock(row,used.get(row.purchase.id)));
+  const available=new Set(stock.filter(row=>row.ready+row.estimate>0).map(row=>row.purchase.id));
+  const carried=new Set(carry.filter(id=>available.has(id)));
+  const ownQueue=[...new Set(plan.queue)].filter(id=>available.has(id)&&!carried.has(id));
+  const queue=[...carried,...ownQueue];
+  const allocation=allocateSewing({queue},stock,progress.budget);
+  carry=queue.filter(id=>allocation.selected.get(id).outside>0);
+  for(const [id,{ready,estimate}] of allocation.selected){
+   const previous=used.get(id)||{ready:0,estimate:0};
+   used.set(id,{ready:previous.ready+ready,estimate:previous.estimate+estimate});
+  }
+  if(period.start>=first.start)months.set(period.key,{period,dates,plan,stock,originalStock,entries,progress,allocation,carried,ownQueue});
+ }
+ return months;
+}
+function renderUpcomingMonths(months,base){
+ $('plan-upcoming-list').innerHTML=[1,2,3].map(offset=>{
+  const period=shiftPlanMonth(base,offset);
+  const {plan,progress,allocation,carried}=months.get(period.key);
+  const carriedPieces=[...carried].reduce((total,id)=>{
+   const lot=allocation.selected.get(id);
+   return total+lot.ready+lot.estimate+lot.outside;
+  },0);
+  return `<article class="plan-month-card">
+   <button class="btn secondary" type="button" data-plan-open-month="${period.start}">${planMonthName(period)}</button>
+   <dl><div><dt>Capacidade</dt><dd>${plan.daily?num(allocation.capacity):'Sem meta'}</dd></div>
+    <div><dt>Programadas</dt><dd>${num(allocation.ready+allocation.estimate)}</dd></div>
+    <div><dt>Vagas</dt><dd>${num(allocation.free)}</dd></div></dl>
+   <p>${num(progress.daysLeft)} dias de produção${carriedPieces?' · '+num(carriedPieces)+' peças vindas de meses anteriores':''}</p>
+   ${allocation.overflow?`<p class="plan-wait">${num(allocation.overflow)} peças passam para o mês seguinte</p>`:''}
+  </article>`;
+ }).join('');
+}
+function openPlanMonth(date){
+ $('plan-period-type').value='month';
+ $('plan-period-date').value=date;
+ loadPlanPeriod();
+ $('plan-period-date').focus();
+}
+$('plan-upcoming-list').onclick=event=>{
+ const button=event.target.closest('[data-plan-open-month]');
+ if(button)openPlanMonth(button.dataset.planOpenMonth);
+};
+$('plan-month-nav').onclick=event=>{
+ const button=event.target.closest('[data-plan-month-step]');
+ if(button)openPlanMonth(shiftPlanMonth(currentPlanPeriod(),Number(button.dataset.planMonthStep)).start);
+};
 function renderSewingPlan(){
- const period=currentPlanPeriod(),dates=productionDates(period),today=planToday();
- const plan=loadPlan(period,dates),stock=sewingStock(plan),entries=periodDailySewing(period);
- const progress=sewingProgress(plan,entries,dates,today);
+ const period=currentPlanPeriod(),today=planToday();
+ const monthly=period.key.startsWith('month:');
+ const base=planPeriod('month',period.start);
+ const months=projectSewingMonths(base,shiftPlanMonth(base,3),today);
+ let state=months.get(period.key);
+ if(!monthly){
+  const dates=productionDates(period),plan=loadPlan(period,dates);
+  const stock=sewingStock(plan),entries=periodDailySewing(period);
+  const progress=sewingProgress(plan,entries,dates,today);
+  state={dates,plan,stock,entries,progress,allocation:allocateSewing(plan,stock,progress.budget),carried:new Set(),originalStock:stock};
+ }
+ const {dates,plan,stock,entries,progress,allocation,carried,originalStock}=state;
  renderWorkCalendar(dates,today,entries);
- const allocation=allocateSewing(plan,stock,progress.budget);
+ renderUpcomingMonths(months,base);
  const {capacity,free,overflow,ready,estimate,selected}=allocation;
  renderDailySewing(plan,entries,progress);
  const planned=ready+estimate;
@@ -1438,17 +1559,19 @@ function renderSewingPlan(){
   <div class="plan-metric"><span>Meta dos dias restantes</span><strong>${num(plan.daily*progress.daysLeft)}</strong><span>${num(plan.daily)} peças/dia × ${num(progress.daysLeft)} ${progress.daysLeft===1?'dia':'dias'}</span></div>
   <div class="plan-metric"><span>Peças no plano restante</span><strong>${num(planned)}</strong><span>${num(ready)} cortadas · ${num(estimate)} estimadas</span></div>
   <div class="plan-metric"><span>Vagas no plano restante</span><strong>${num(free)}</strong><span>peças</span></div>
-  <div class="plan-metric ${overflow?'plan-attention':''}"><span>Fora da capacidade</span><strong>${num(overflow)}</strong><span>peças na fila</span></div>
+  <div class="plan-metric ${overflow?'plan-attention':''}"><span>${monthly?'Passam para o mês seguinte':'Fora da capacidade'}</span><strong>${num(overflow)}</strong><span>peças na fila</span></div>
   <label class="plan-progress">Ocupação do plano restante<progress max="${capacity||1}" value="${planned}">${num(planned)} de ${num(capacity)}</progress></label>`;
  const queue=[...selected.keys()];
  const stockById=new Map(stock.map(row=>[row.purchase.id,row]));
  const ordered=[...queue.map(id=>stockById.get(id)),...stock.filter(row=>!selected.has(row.purchase.id))];
- $('plan-stock').innerHTML=ordered.map(row=>renderPlanStockRow(row,selected.get(row.purchase.id),queue)).join('')||
+ const originalById=new Map(originalStock.map(row=>[row.purchase.id,row]));
+ $('plan-stock').innerHTML=ordered.map(row=>renderPlanStockRow(row,selected.get(row.purchase.id),state.ownQueue||queue,monthly,carried.has(row.purchase.id),originalById.get(row.purchase.id))).join('')||
   '<p class="hint">Nenhum lote com malha recebida a cortar ou peças cortadas para costurar.</p>';
  $('plan-add-all').disabled=stock.every(row=>selected.has(row.purchase.id)||row.ready+row.estimate===0);
 }
 function loadPlanPeriod(){
  const period=currentPlanPeriod(),plan=loadPlan(period);
+ $('plan-month-nav').hidden=!period.key.startsWith('month:');
  $('plan-period-label').textContent=fmtDate(period.start)+' a '+fmtDate(period.end);
  $('plan-daily').value=plan.daily||'';
  $('plan-calendar-message').textContent='';
@@ -1485,7 +1608,7 @@ $('plan-capacity-form').onsubmit=event=>{
  event.preventDefault();
  const period=currentPlanPeriod(),plan=loadPlan(period);
  plan.daily=planInteger($('plan-daily').value,PLAN_MAX_PIECES);
- if(savePlan(period,plan,'Meta salva.'))renderSewingPlan();
+ if(savePlan(period,plan,'Meta salva.',true))renderSewingPlan();
 };
 $('plan-stock').onsubmit=event=>{
  const form=event.target.closest('[data-plan-estimate]');
@@ -1500,7 +1623,8 @@ $('plan-stock').onsubmit=event=>{
 };
 $('plan-add-all').onclick=()=>{
  const period=currentPlanPeriod(),plan=loadPlan(period);
- const ids=sewingStock(plan).filter(row=>row.ready+row.estimate>0).map(row=>row.purchase.id);
+ const monthly=period.key.startsWith('month:')?projectSewingMonths(period,period,planToday()).get(period.key):null;
+ const ids=(monthly?.stock||sewingStock(plan)).filter(row=>row.ready+row.estimate>0&&!monthly?.carried.has(row.purchase.id)).map(row=>row.purchase.id);
  plan.queue=[...new Set([...plan.queue,...ids])];
  if(savePlan(period,plan,'Lotes incluídos na fila.'))renderSewingPlan();
 };
@@ -1509,7 +1633,8 @@ $('plan-stock').onclick=event=>{
  if(!button)return;
  const id=button.closest('[data-plan-row]').dataset.planRow;
  const period=currentPlanPeriod(),plan=loadPlan(period);
- const queue=[...allocateSewing(plan,sewingStock(plan)).selected.keys()];
+ const monthly=period.key.startsWith('month:')?projectSewingMonths(period,period,planToday()).get(period.key):null;
+ const queue=monthly?.ownQueue||[...allocateSewing(plan,sewingStock(plan)).selected.keys()];
  const index=queue.indexOf(id);
  const action=button.dataset.planAction;
  if(action==='add'&&index<0)queue.push(id);
@@ -1519,7 +1644,7 @@ $('plan-stock').onclick=event=>{
   if(index<0||to<0||to>=queue.length)return;
   [queue[index],queue[to]]=[queue[to],queue[index]];
  }
- plan.queue=queue;
+ plan.queue=monthly?[...queue,...plan.queue.filter(other=>other!==id&&!queue.includes(other))]:queue;
  if(savePlan(period,plan,'Fila atualizada.')){
   renderSewingPlan();
   const row=Array.from($('plan-stock').querySelectorAll('[data-plan-row]')).find(item=>item.dataset.planRow===id);
