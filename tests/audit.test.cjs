@@ -559,3 +559,78 @@ test('movement history ranks each purchase by its earliest pending brand deadlin
  h.el('history-search').value='MAL-0003';
  assert.doesNotMatch(render(),/history-group-delivered/);
 });
+
+test('confirming a cost removes only that brand from the selector and keeps it searchable and editable',()=>{
+ const h=harness();
+ h.seed({
+  parents:[{id:'p',number:'MAL-0001',invoice:'8910'}],
+  lots:[
+   {id:'a',parentId:'p',brand:'Algodão',client:'Cliente A',model:'Polo',quantity:100},
+   {id:'b',parentId:'p',brand:'Outra marca',quantity:20}
+  ],
+  costData:{a:{good:75,damaged:8,pending:17,items:[item('malha',100,0,'total'),item('costura',2,20)],
+   history:[{at:'2026-11-11T12:00:00Z',good:70,damaged:10,pending:20,total:100,items:[item('malha',100,0,'total')],
+    complements:[{origin:'pendente',recovered:3,additional:20,items:[item('costura',2,10)]},{origin:'avaria',recovered:2,additional:20,items:[item('costura',2,10)]}]}]
+  }}
+ });
+ const select=h.el('cost-lot'),saved=h.el('cost-saved-list');
+ const confirm=h.el('cost-confirm'),search=h.el('cost-saved-search');
+ h.run('showCostPage()');
+ assert.equal(confirm.hidden,true);
+ select.value='a';select.onchange();
+ assert.equal(confirm.hidden,false);
+ confirm.onclick();
+ assert.equal(select.value,'');
+ assert.doesNotMatch(select.innerHTML,/value="a"/);
+ assert.match(select.innerHTML,/value="b"/);
+ assert.match(saved.innerHTML,/Algodão · MAL-0001[\s\S]*17 pendentes · 8 avarias[\s\S]*Confirmado/);
+ search.value='inexistente';search.oninput();
+ assert.match(saved.innerHTML,/Nenhum custo encontrado/);
+ search.value='algodao';search.oninput();
+ assert.match(saved.innerHTML,/Algodão/);
+ search.value='8910';search.oninput();
+ assert.match(saved.innerHTML,/NF 8910/);
+ saved.onclick({target:{closest:()=>({dataset:{editSavedCost:'a'}})}});
+ assert.equal(h.run('selectedCostLotId()'),'a');
+ assert.doesNotMatch(select.innerHTML,/value="a"/);
+ assert.equal(h.el('cost-good').value,75);
+ assert.equal(h.el('cost-pending').value,17);
+ assert.equal(h.el('cost-damaged').value,8);
+ assert.match(h.el('cost-history').innerHTML,/Lançar custo pendente[\s\S]*Editar avarias/);
+ h.el('cost-good').value=77;
+ h.el('cost-pending').value=16;
+ h.el('cost-damaged').value=7;
+ h.context.mockItems=[item('malha',110,0,'total')];
+ h.run('costModes=()=>COST_ITEMS.map(([id,label,mode])=>mockItems.find(x=>x.id===id)||{id,label,mode,value:0,qty:0,total:0})');
+ clickSave(h);
+ const data=state(h).costData.a;
+ assert.deepEqual([data.good,data.pending,data.damaged],[77,16,7]);
+ assert.deepEqual([data.history[0].good,data.history[0].pending,data.history[0].damaged],[72,19,9]);
+ assert.equal(data.history[0].complements.length,2);
+ assert.equal(h.run('costTotal(costData.a)'),150);
+ assert.ok(data.costConfirmedAt);
+ assert.match(saved.innerHTML,/16 pendentes · 7 avarias/);
+ h.el('cost-reopen').onclick();
+ assert.match(select.innerHTML,/value="a"/);
+ assert.equal(state(h).costData.a.costConfirmedAt,undefined);
+ assert.equal(state(h).lots.length,2);
+});
+
+test('a confirmed cost downloaded from the cloud is removed from the selector on another computer',async()=>{
+ const h=harness();
+ const local={good:4,damaged:0,pending:0,history:[{good:4,damaged:0,pending:0,total:0}]};
+ h.seed({lots:[{id:'a',brand:'Marca A',quantity:4}],costData:{a:local}});
+ h.context.remoteCost={...local,costConfirmedAt:'2026-11-13T12:00:00Z'};
+ h.run(`cloudSession={access_token:'test',user_id:'u'};
+ localStorage.setItem(CLOUD_COST_BASE,JSON.stringify({a:cloudLotJson(costData.a)}));
+ cloudMaterialsRequest=async(table,method)=>{
+  if(method!=='GET')throw Error('Unexpected write');
+  return table==='lot_costs'?[{lot_id:'a',data:remoteCost}]:[{id:'a'}];
+ };
+ showCostPage();`);
+ assert.match(h.el('cost-lot').innerHTML,/value="a"/);
+ await h.run('cloudSyncCosts(true)');
+ assert.doesNotMatch(h.el('cost-lot').innerHTML,/value="a"/);
+ assert.match(h.el('cost-saved-list').innerHTML,/Marca A[\s\S]*Confirmado/);
+ assert.equal(state(h).costData.a.costConfirmedAt,'2026-11-13T12:00:00Z');
+});
