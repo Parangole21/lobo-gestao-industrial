@@ -716,3 +716,37 @@ test('brands can be created as Separação and moved to Parado without treating 
  h.run("lots[0].history.push({status:'Embalagem'},{status:'Parado'});");
  assert.equal(h.run('sewingStock({estimates:{}}).length'),0);
 });
+
+test('cloud refresh waits for each active lot status selector and coalesces repeated renders',async()=>{
+ for(const selector of ['#child-status','select[data-saved-status]','select[data-delivery-status]','#child-parent-select']){
+  const h=harness();
+  const selected={id:'p',number:'MAL-0001',kg:10};
+  const downloaded={...selected,kg:20};
+  h.seed({parents:[selected]});
+  h.run('renderLots()');
+  let blur;
+  const timers=[];
+  h.context.document.activeElement={
+   matches:list=>list.split(', ').includes(selector),
+   addEventListener(type,listener,options){
+    assert.equal(type,'blur');
+    assert.equal(options.once,true);
+    assert.equal(blur,undefined);
+    blur=listener;
+   }
+  };
+  h.context.setTimeout=callback=>{timers.push(callback);return timers.length};
+  materialBase(h,[selected]);materialServer(h,[downloaded]);
+  const list=h.el('parent-list');
+  const before=list.innerHTML;
+  await h.run('cloudSyncMaterials(true)');
+  await h.run('cloudSyncMaterials(true)');
+  assert.equal(state(h).parents[0].kg,20);
+  assert.equal(list.innerHTML,before);
+  h.context.document.activeElement=null;
+  blur();
+  assert.equal(timers.length,1);
+  timers.shift()();
+  assert.match(list.innerHTML,/>20 kg</);
+ }
+});
