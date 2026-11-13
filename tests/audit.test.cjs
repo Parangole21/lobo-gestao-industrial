@@ -520,3 +520,36 @@ test('date filters display monthly production immediately for one date or an inc
  start.value='';start.onchange();
  assert.equal(result.innerHTML,'');
 });
+
+test('movement history ranks each purchase by its earliest pending brand deadline',()=>{
+ const h=harness();
+ h.run("planToday=()=> '2026-11-13'");
+ h.seed({
+  parents:['late','soon','later','undated','done'].map((id,index)=>({id,number:'MAL-000'+(index+1)})),
+  lots:[
+   {id:'a',parentId:'late',status:'Corte',productionEnd:'2026-11-12'},
+   {id:'b',parentId:'soon',status:'Embalagem',productionEnd:'2026-11-14'},
+   {id:'c',parentId:'soon',brand:'Procurada',status:'Costura',productionEnd:'2026-11-28'},
+   {id:'d',parentId:'later',status:'Costura',productionEnd:'2026-11-20'},
+   {id:'e',parentId:'later',status:'Entregue',productionEnd:'2026-11-01'},
+   {id:'f',parentId:'undated',status:'Corte',productionEnd:'2026-02-30'},
+   {id:'g',parentId:'done',status:'Entregue',productionEnd:'2026-11-01'}
+  ]
+ });
+ const render=()=>{
+  h.el('history-search').oninput();
+  return h.el('lot-history').innerHTML;
+ };
+ const html=render();
+ const order=markup=>[...markup.matchAll(/data-history-group="purchase:([^"]+)"/g)].map(match=>match[1]);
+ assert.deepEqual(order(html),['late','soon','later','undated','done']);
+ assert.match(html,/Saída prevista em <strong>12\/11\/2026<\/strong> · Em atraso/);
+ assert.match(html,/Saída prevista em <strong>14\/11\/2026<\/strong>/);
+ assert.match(html,/Sem previsão de saída/);
+ assert.match(html,/Todas as marcas entregues/);
+ h.el('history-search').value='Procurada';
+ assert.match(render(),/data-history-group="purchase:soon" open[\s\S]*Saída prevista em <strong>14\/11\/2026<\/strong>/);
+ h.el('history-search').value='';
+ h.run("lots.find(lot=>lot.id==='a').status='Entregue';lots.find(lot=>lot.id==='b').productionEnd='2026-11-22'");
+ assert.deepEqual(order(render()).slice(0,3),['later','soon','undated']);
+});
