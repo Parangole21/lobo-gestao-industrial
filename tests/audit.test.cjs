@@ -459,8 +459,15 @@ test('future months can be opened and show inherited estimated pieces and capaci
  h.el('plan-stock').onsubmit({preventDefault,target:{closest:()=>({dataset:{planEstimate:'x'},querySelector:()=>({value:'260'})})}});
  h.el('plan-add-all').onclick();
  assert.match(h.el('plan-stock').innerHTML,/160 passam para o mês seguinte/);
- assert.match(h.el('plan-upcoming-list').innerHTML,/dezembro de 2026[\s\S]*Capacidade<\/dt><dd>2\.200<\/dd>[\s\S]*Programadas<\/dt><dd>160/);
- h.el('plan-upcoming-list').onclick({target:{closest:()=>({dataset:{planOpenMonth:'2026-12-01'}})}});
+ h.el('plan-query').open=true;
+ h.el('plan-query-type').value='next';
+ h.el('plan-query').ontoggle();
+ const result=h.el('plan-query-result').innerHTML;
+ assert.match(result,/01\/12\/2026 a 31\/12\/2026/);
+ assert.match(result,/Capacidade disponível<\/span><strong>2\.200/);
+ assert.match(result,/Programadas para costura<\/span><strong>160/);
+ assert.match(result,/MAL-0001[\s\S]*>60<\/td>/);
+ h.el('plan-month-nav').onclick({target:{closest:()=>({dataset:{planMonthStep:'1'}})}});
  assert.equal(h.el('plan-daily').value,100);
  assert.match(h.el('plan-stock').innerHTML,/160 peças no plano[\s\S]*Saldo de meses anteriores/);
  assert.doesNotMatch(h.el('plan-stock').innerHTML,/Incluir na fila/);
@@ -470,4 +477,41 @@ test('future months can be opened and show inherited estimated pieces and capaci
  h.run("planToday=()=> '2026-12-01'; renderSewingPlan()");
  assert.match(h.el('plan-stock').innerHTML,/260 peças programadas em meses anteriores/);
  assert.equal(h.run("loadPlans()['month:2026-12-01']"),undefined);
+});
+
+test('consulting a day or week uses the same monthly priority, including dates before the selected range',()=>{
+ const h=harness();
+ h.run("planToday=()=> '2026-11-16'");
+ h.seed({
+  parents:[{id:'a',number:'MAL-0001'},{id:'b',number:'MAL-0002'}],
+  cuts:[{parentId:'a',pieces:130},{parentId:'b',pieces:420}],
+  lots:[{parentId:'a',brand:'Camiseta A',quantity:130,status:'Corte'}]
+ });
+ h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:100,queue:['a','b']}}))`);
+ h.el('plan-period-date').value='2026-11-18';
+ h.el('plan-period-type').value='month';
+ h.run('showSewingPlan()');
+ assert.equal(h.el('plan-query-result').innerHTML,'');
+ h.el('plan-period-type').value='week';
+ h.el('plan-period-type').onchange();
+ const result=h.el('plan-query-result');
+ assert.equal(h.el('plan-query').open,true);
+ assert.match(result.innerHTML,/16\/11\/2026 a 22\/11\/2026/);
+ assert.match(result.innerHTML,/Programadas para costura<\/span><strong>400/);
+ assert.match(result.innerHTML,/MAL-0001[\s\S]*Camiseta A/);
+ assert.match(result.innerHTML,/MAL-0002/);
+ assert.doesNotMatch(result.innerHTML,/scope="rowgroup" rowspan="\d+">20\/11\/2026/);
+ h.el('plan-query-type').value='day';
+ h.el('plan-query-type').onchange();
+ assert.match(result.innerHTML,/18\/11\/2026 a 18\/11\/2026/);
+ assert.match(result.innerHTML,/Programadas para costura<\/span><strong>100/);
+ assert.doesNotMatch(result.innerHTML,/MAL-0001/);
+ h.el('plan-query-start').value='2026-11-17';
+ h.el('plan-query-start').onchange();
+ assert.equal(h.el('plan-query-type').value,'range');
+ assert.match(result.innerHTML,/Programadas para costura<\/span><strong>200/);
+ assert.match(result.innerHTML,/MAL-0001[\s\S]*>30<\/td>/);
+ h.el('plan-query-end').value='2026-11-16';
+ h.el('plan-query-end').onchange();
+ assert.match(result.innerHTML,/Informe as duas datas em ordem/);
 });
