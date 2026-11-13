@@ -583,7 +583,7 @@ test('confirming a cost removes only that brand from the selector and keeps it s
  assert.equal(select.value,'');
  assert.doesNotMatch(select.innerHTML,/value="a"/);
  assert.match(select.innerHTML,/value="b"/);
- assert.match(saved.innerHTML,/Algodão · MAL-0001[\s\S]*17 pendentes · 8 avarias[\s\S]*Confirmado/);
+ assert.match(saved.innerHTML,/MAL-0001[\s\S]*Algodão[\s\S]*17 pendentes · 8 avarias[\s\S]*Confirmado/);
  search.value='inexistente';search.oninput();
  assert.match(saved.innerHTML,/Nenhum custo encontrado/);
  search.value='algodao';search.oninput();
@@ -633,4 +633,41 @@ test('a confirmed cost downloaded from the cloud is removed from the selector on
  assert.doesNotMatch(h.el('cost-lot').innerHTML,/value="a"/);
  assert.match(h.el('cost-saved-list').innerHTML,/Marca A[\s\S]*Confirmado/);
  assert.equal(state(h).costData.a.costConfirmedAt,'2026-11-13T12:00:00Z');
+});
+
+test('registered costs expand by MAL, keep the edit action for each brand and preserve open groups on refresh',()=>{
+ const h=harness(),saved=h.el('cost-saved-list'),search=h.el('cost-saved-search');
+ h.seed({
+  parents:[{id:'p',number:'MAL-0001',invoice:'8910'},{id:'q',number:'MAL-0002',invoice:'8910'}],
+  lots:[
+   {id:'a',parentId:'p',brand:'Algodão',quantity:100},
+   {id:'b',parentId:'p',brand:'Outra marca',client:'Cliente B',quantity:20},
+   {id:'c',parentId:'q',brand:'Marca C',quantity:30},
+   {id:'d',parentId:'p',brand:'Sem apuração',quantity:30}
+  ],
+  costData:{
+   a:{costConfirmedAt:'2026-11-13T12:00:00Z',history:[{total:100}]},
+   b:{history:[{total:20}]},
+   c:{history:[{total:30}]}
+  }
+ });
+ h.run('showCostPage()');
+ const group=key=>saved.innerHTML.match(new RegExp('<details[^>]*data-cost-group="purchase:'+key+'"[^>]*>[\\s\\S]*?</details>'))[0];
+ assert.match(group('p'),/<strong>MAL-0001<\/strong>[\s\S]*2 marcas/);
+ assert.match(group('p'),/data-edit-saved-cost="a"/);
+ assert.match(group('p'),/data-edit-saved-cost="b"/);
+ assert.doesNotMatch(group('p'),/data-edit-saved-cost="[cd]"/);
+ assert.match(group('q'),/data-edit-saved-cost="c"/);
+ assert.doesNotMatch(saved.innerHTML,/data-cost-group="[^"]+" open/);
+ saved.querySelectorAll=()=>[{dataset:{costGroup:'purchase:p'}}];
+ h.run('refreshCostChoices()');
+ assert.match(group('p'),/data-cost-group="purchase:p" open/);
+ assert.doesNotMatch(group('q'),/data-cost-group="purchase:q" open/);
+ search.value='cliente b';search.oninput();
+ assert.match(group('p'),/data-cost-group="purchase:p" open/);
+ assert.match(group('p'),/data-edit-saved-cost="b"/);
+ assert.doesNotMatch(saved.innerHTML,/data-edit-saved-cost="[ac]"/);
+ search.value='8910';search.oninput();
+ assert.match(group('p'),/data-edit-saved-cost="a"/);
+ assert.match(group('q'),/data-cost-group="purchase:q" open/);
 });
