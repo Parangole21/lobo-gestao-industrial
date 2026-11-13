@@ -546,10 +546,16 @@ test('movement history ranks each purchase by its earliest pending brand deadlin
  assert.match(html,/Saída prevista em <strong>12\/11\/2026<\/strong> · Em atraso/);
  assert.match(html,/Saída prevista em <strong>14\/11\/2026<\/strong>/);
  assert.match(html,/Sem previsão de saída/);
- assert.match(html,/Todas as marcas entregues/);
+ assert.match(html,/<span class="history-group-delivered"><span aria-hidden="true">✓<\/span> Todas as marcas entregues<\/span>/);
+ assert.equal((html.match(/class="history-group-delivered"/g)||[]).length,1);
+ assert.match(html.split('data-history-group="purchase:done"')[1],/history-group-delivered/);
  h.el('history-search').value='Procurada';
  assert.match(render(),/data-history-group="purchase:soon" open[\s\S]*Saída prevista em <strong>14\/11\/2026<\/strong>/);
  h.el('history-search').value='';
  h.run("lots.find(lot=>lot.id==='a').status='Entregue';lots.find(lot=>lot.id==='b').productionEnd='2026-11-22'");
- assert.deepEqual(order(render()).slice(0,3),['later','soon','undated']);
+ const updated=render();
+ assert.deepEqual(order(updated).slice(0,3),['later','soon','undated']);
+ assert.equal((updated.match(/class="history-group-delivered"/g)||[]).length,2);
+ h.el('history-search').value='MAL-0003';
+ assert.doesNotMatch(render(),/history-group-delivered/);
 });
