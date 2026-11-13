@@ -671,3 +671,48 @@ test('registered costs expand by MAL, keep the edit action for each brand and pr
  assert.match(group('p'),/data-edit-saved-cost="a"/);
  assert.match(group('q'),/data-cost-group="purchase:q" open/);
 });
+
+test('planning groups brands by purchase and opens individual costs, good pieces and damages',()=>{
+ const h=harness();
+ h.seed({
+  parents:[{id:'p1',number:'MAL-0001',invoice:'9876'},{id:'p2',number:'MAL-0002',invoice:'9876'}],
+  lots:[
+   {id:'a',parentId:'p1',brand:'Polo A',quantity:100,status:'Separação',productionEnd:'2026-11-20',model:'Piquet'},
+   {id:'b',parentId:'p1',brand:'Polo B',quantity:120,status:'Parado',productionEnd:'2026-11-21'},
+   {id:'c',parentId:'p2',brand:'Polo C',quantity:50,status:'Corte'}
+  ],
+  costData:{a:{good:98,damaged:3,pending:2,history:[{total:1000,items:[item('malha',1000,0,'total')],
+   complements:[{additional:127,items:[item('costura',127,1)]}]}]}}
+ });
+ h.run('showIndicators()');
+ const container=h.el('ind-lot-rows');
+ assert.match(container.innerHTML,/data-ind-lot="purchase:p1">[\s\S]*MAL-0001[\s\S]*NF 9876 · 220 peças[\s\S]*2 marcas/);
+ assert.match(container.innerHTML,/data-ind-brand="a">[\s\S]*Polo A[\s\S]*Separação[\s\S]*Peças boas \(subiram\)<\/dt><dd>98[\s\S]*Peças pendentes<\/dt><dd>2[\s\S]*Avarias<\/dt><dd>3/);
+ assert.match(container.innerHTML,/Custo total<\/dt><dd>R\$\s1\.127,00[\s\S]*Custo por peça boa<\/dt><dd>R\$\s11,50[\s\S]*Custos por item/);
+ assert.match(container.innerHTML,/data-ind-brand="b">[\s\S]*Parado[\s\S]*Custo ainda não apurado/);
+ assert.match(container.innerHTML,/data-ind-lot="purchase:p2">[\s\S]*MAL-0002[\s\S]*data-ind-brand="c">/);
+ container.querySelectorAll=selector=>selector.includes('data-ind-lot')?[{dataset:{indLot:'purchase:p1'}}]:[{dataset:{indBrand:'a'}}];
+ h.run('renderIndicators()');
+ assert.match(container.innerHTML,/data-ind-lot="purchase:p1" open/);
+ assert.match(container.innerHTML,/data-ind-brand="a" open/);
+ h.el('ind-brand').value='Polo C';h.el('ind-brand').onchange();
+ assert.doesNotMatch(container.innerHTML,/data-ind-lot="purchase:p1"/);
+});
+
+test('brands can be created as Separação and moved to Parado without treating a pause as sewn',()=>{
+ const h=harness();
+ h.seed({parents:[{id:'p',number:'MAL-0001'}],cuts:[{parentId:'p',pieces:100}]});
+ h.el('child-parent-select').value='p';
+ h.el('child-brand').value='Polo';
+ h.el('child-quantity').value='100';
+ h.el('child-status').value='Separação';
+ h.el('child-form').onsubmit({preventDefault(){}});
+ const lot=state(h).lots[0];
+ assert.equal(lot.status,'Separação');
+ assert.match(h.el('child-saved-list').innerHTML,/<option value="Separação" selected>/);
+ h.el('child-saved-list').onchange({target:{matches:()=>true,dataset:{savedStatus:lot.id},value:'Parado'}});
+ assert.equal(state(h).lots[0].history.at(-1).status,'Parado');
+ assert.equal(h.run('sewingStock({estimates:{}})[0].ready'),100);
+ h.run("lots[0].history.push({status:'Embalagem'},{status:'Parado'});");
+ assert.equal(h.run('sewingStock({estimates:{}}).length'),0);
+});
