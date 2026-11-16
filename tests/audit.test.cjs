@@ -813,3 +813,97 @@ test('the date filter highlights capacity across months separately from programm
  assert.match(h.el('plan-detail-range').textContent,/4\.836 peças programadas/);
  assert.match(h.el('plan-detail-result').innerHTML,/Vagas na capacidade: 1\.674 peças/);
 });
+
+test('new cut selector only lists untouched received fabric and allows continuing a partial cut from its lot',()=>{
+ const h=harness();
+ h.seed({
+  parents:[{id:'first',number:'MAL-0001',kg:100},{id:'partial',number:'MAL-0002',kg:100},
+   {id:'done',number:'MAL-0003',kg:100},{id:'waiting',number:'MAL-0004',kg:100,simulatedPieces:350}],
+  records:['first','partial','done'].map(purchaseId=>({purchaseId,materials:{malha:{kg:100}}})),
+  cuts:[{id:'c1',parentId:'partial',kg:20,pieces:80},{id:'c2',parentId:'done',kg:100,pieces:400}]
+ });
+ h.run('showCutPage()');
+ const select=h.el('cut-parent');
+ assert.match(select.innerHTML,/value="first"/);
+ assert.doesNotMatch(select.innerHTML,/value="(?:partial|done|waiting)"/);
+ const summary=h.el('cut-summary');
+ assert.match(summary.innerHTML,/data-cut-remainder="partial"/);
+ assert.doesNotMatch(summary.innerHTML,/data-cut-remainder="done"/);
+ summary.onclick({target:{closest:()=>({dataset:{cutRemainder:'partial'}})}});
+ assert.match(select.innerHTML,/value="partial"/);
+ assert.equal(select.value,'partial');
+ assert.match(h.el('cut-stock-info').textContent,/80 kg/);
+ h.el('cut-kg').value='80';h.el('cut-pieces').value='300';
+ h.el('cut-form').onsubmit({preventDefault(){}});
+ assert.equal(h.run("cutPieces('partial')"),380);
+ assert.doesNotMatch(select.innerHTML,/value="partial"/);
+ assert.doesNotMatch(summary.innerHTML,/data-cut-remainder="partial"/);
+});
+
+test('a new purchase simulation can enter the queue before receipt and be edited or removed without changing real cuts',async()=>{
+ const h=harness();
+ h.run("planToday=()=> '2026-11-16'");
+ h.el('parent-kg-input').value='100';
+ h.el('parent-fabric-brand').value='Malha Polo';
+ const estimateInput=h.el('parent-simulated-pieces');
+ estimateInput.value='350.5';
+ h.el('parent-form').onsubmit({preventDefault(){}});
+ assert.equal(state(h).parents.length,0);
+ estimateInput.value='350';
+ h.el('parent-form').onsubmit({preventDefault(){}});
+ const purchase=state(h).parents[0];
+ assert.equal(purchase.simulatedPieces,350);
+ assert.equal(state(h).cuts.length,0);
+ await h.el('parent-list').onclick({target:{closest:()=>({dataset:{editParent:purchase.id}})}});
+ assert.equal(Number(estimateInput.value),350);
+ h.run('showSewingPlan()');
+ h.el('plan-daily').value='350';
+ h.el('plan-capacity-form').onsubmit({preventDefault(){}});
+ const stock=h.el('plan-stock');
+ assert.match(stock.innerHTML,/Aguardando recebimento[\s\S]*350 peças simuladas[\s\S]*Editar simulação[\s\S]*Excluir simulação/);
+ h.el('plan-add-all').onclick();
+ assert.match(stock.innerHTML,/350 peças no plano[\s\S]*0 cortadas · 350 estimadas/);
+ assert.match(h.el('plan-detail-result').innerHTML,/350 simuladas/);
+ const editEstimate=value=>stock.onsubmit({preventDefault(){},target:{closest:()=>({
+  dataset:{planEstimate:purchase.id},querySelector:()=>({value})
+ })}});
+ editEstimate('370');
+ assert.equal(state(h).parents[0].simulatedPieces,370);
+ h.seed({records:[{purchaseId:purchase.id,materials:{malha:{kg:90}}}],cuts:[{parentId:purchase.id,kg:30,pieces:110}]});
+ h.run('renderSewingPlan()');
+ assert.match(stock.innerHTML,/110 peças cortadas para costurar[\s\S]*260 peças simuladas/);
+ // A exclusão também suprime uma simulação antiga do planejamento mensal.
+ h.run(`const period=currentPlanPeriod(),plan=loadPlan(period);plan.estimates[parents[0].id]={pieces:200,cutAtEntry:110};savePlan(period,plan,'');`);
+ stock.onclick({target:{closest:()=>({dataset:{deletePlanEstimate:purchase.id}})}});
+ assert.equal(state(h).parents[0].simulatedPieces,null);
+ assert.equal(state(h).cuts[0].pieces,110);
+ assert.match(stock.innerHTML,/110 peças no plano/);
+ assert.doesNotMatch(stock.innerHTML,/peças simuladas<\/span>/);
+ editEstimate('375');
+ h.run("cuts.push({parentId:parents[0].id,kg:60,pieces:250});renderSewingPlan()");
+ assert.match(stock.innerHTML,/360 peças cortadas para costurar/);
+ assert.match(stock.innerHTML,/360 peças no plano/);
+ assert.doesNotMatch(stock.innerHTML,/peças simuladas<\/span>/);
+});
+
+test('a simulation edited during purchase synchronization remains pending for the next sync',async()=>{
+ const h=harness();
+ const original={id:'p',number:'MAL-0001',kg:100,simulatedPieces:300};
+ h.seed({parents:[{...original,simulatedPieces:350}]});
+ materialBase(h,[original]);
+ materialServer(h,[original]);
+ const sent=[];
+ h.context.fetch=async(url,options)=>{
+  const {data}=JSON.parse(options.body);
+  sent.push(data.simulatedPieces);
+  if(sent.length===1)h.run("saveCutSimulation('p',400)");
+  h.context.mockPurchases=[{id:'p',data,updated_at:'2026-11-16T12:00:00Z'}];
+  return {ok:true,json:async()=>[{}]};
+ };
+ await h.run('cloudSyncMaterials(true)');
+ assert.equal(state(h).parents[0].simulatedPieces,400);
+ assert.equal(h.run("JSON.parse(readMaterialsBaseline().purchases.p).simulatedPieces"),350);
+ await h.run('cloudSyncMaterials(true)');
+ assert.deepEqual(sent,[350,400]);
+ assert.equal(h.run("JSON.parse(readMaterialsBaseline().purchases.p).simulatedPieces"),400);
+});
