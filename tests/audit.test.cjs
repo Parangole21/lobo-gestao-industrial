@@ -312,7 +312,7 @@ test('sewing planner UI keeps capacity and simulations per period and restores n
  });
  h.run('showSewingPlan()');
  assert.equal(h.el('page-planejamento').style.display,'block');
- assert.equal(h.el('plan-period-label').textContent,'01/11/2026 a 30/11/2026');
+ assert.equal(h.el('plan-period-label').textContent,'Meta de 01/11/2026 a 30/11/2026');
  assert.match(h.el('plan-stock').innerHTML,/MAL-0001[\s\S]*NF 123[\s\S]*Sem corte registrado/);
  const preventDefault=()=>{};
  h.el('plan-daily').value='400';
@@ -322,7 +322,7 @@ test('sewing planner UI keeps capacity and simulations per period and restores n
  assert.match(h.el('plan-stock').innerHTML,/5\.200 peças no plano/);
  assert.match(h.el('plan-stock').innerHTML,/3\.200 passam para o mês seguinte/);
  date.value='2026-12-01';date.onchange();
- assert.equal(h.el('plan-period-label').textContent,'01/12/2026 a 31/12/2026');
+ assert.equal(h.el('plan-period-label').textContent,'Meta de 01/12/2026 a 31/12/2026');
  assert.match(h.el('plan-stock').innerHTML,/3\.200 peças no plano/);
  date.value='2026-11-11';date.onchange();
  assert.match(h.el('plan-stock').innerHTML,/5\.200 peças no plano/);
@@ -353,14 +353,14 @@ test('saving, correcting and deleting a daily sewing total updates the monthly p
  const outputDate=h.el('plan-output-date'),pieces=h.el('plan-output-pieces');
  outputDate.value='2026-11-24';outputDate.onchange();
  pieces.value='450';h.el('plan-output-form').onsubmit({preventDefault});
- assert.match(h.el('plan-query-result').innerHTML,/<strong>1\.550<\/strong> peças previstas/);
+ assert.match(h.el('plan-detail-range').textContent,/1\.550 peças programadas/);
  assert.match(h.el('plan-stock').innerHTML,/1\.550 peças no plano/);
  assert.match(h.el('plan-detail-result').innerHTML,/Capacidade: 1\.600 peças · Vagas na capacidade: 50 peças/);
  assert.match(h.el('plan-capacity').innerHTML,/Vagas na capacidade do mês<\/span><strong>50/);
  const piecesByRow=[...h.el('plan-detail-result').innerHTML.matchAll(/<td class="plan-query-number">([\d.]+)<\/td>/g)];
  assert.equal(piecesByRow.reduce((sum,row)=>sum+Number(row[1].replaceAll('.','')),0),1550);
  pieces.value='460';h.el('plan-output-form').onsubmit({preventDefault});
- assert.match(h.el('plan-query-result').innerHTML,/<strong>1\.540<\/strong>/);
+ assert.match(h.el('plan-detail-range').textContent,/1\.540 peças programadas/);
  assert.equal((h.el('plan-output-entries').innerHTML.match(/class="plan-output-entry"/g)||[]).length,1);
  assert.match(h.el('plan-output-entries').innerHTML,/24\/11\/2026[\s\S]*460 peças/);
  h.el('plan-output-entries').onclick({target:{closest:()=>({dataset:{outputDelete:'2026-11-24'}})}});
@@ -471,7 +471,7 @@ test('future months can be opened and show inherited estimated pieces and capaci
  assert.match(h.el('plan-stock').innerHTML,/160 passam para o mês seguinte/);
  const start=h.el('plan-query-start'),end=h.el('plan-query-end');
  start.value='2026-12-01';end.value='2026-12-31';start.onchange();
- assert.match(h.el('plan-query-result').innerHTML,/<strong>160<\/strong> peças previstas/);
+ assert.match(h.el('plan-detail-range').textContent,/160 peças programadas/);
  assert.match(h.el('plan-detail-range').textContent,/01\/12\/2026 a 31\/12\/2026/);
  const result=h.el('plan-detail-result').innerHTML;
  assert.match(result,/Capacidade: 2\.200 peças/);
@@ -498,11 +498,11 @@ test('date filters display monthly production immediately for one date or an inc
  h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:100,queue:['a','b']}}))`);
  h.run('showSewingPlan()');
  const result=h.el('plan-query-result'),start=h.el('plan-query-start'),end=h.el('plan-query-end');
- assert.match(result.innerHTML,/<strong>550<\/strong> peças previstas/);
+ assert.match(result.innerHTML,/Capacidade para <strong>1\.000<\/strong> peças/);
  assert.match(result.innerHTML,/16\/11\/2026 a 30\/11\/2026/);
  start.value='2026-11-18';start.onchange();
- assert.match(h.el('plan-detail-range').textContent,/18\/11\/2026 · 100 peças previstas/);
- assert.match(result.innerHTML,/<strong>100<\/strong> peças previstas/);
+ assert.match(h.el('plan-detail-range').textContent,/18\/11\/2026 · 100 peças programadas/);
+ assert.match(result.innerHTML,/Capacidade para <strong>100<\/strong> peças/);
  assert.doesNotMatch(result.innerHTML,/MAL-0001|MAL-0002|Capacidade:/);
  result.onclick({target:{closest:()=>({})}});
  assert.equal(h.el('plan-overview').hidden,true);
@@ -514,13 +514,13 @@ test('date filters display monthly production immediately for one date or an inc
  start.value='2026-11-17';start.onchange();
  end.value='2026-11-22';end.onchange();
  assert.match(h.el('plan-detail-range').textContent,/17\/11\/2026 a 22\/11\/2026/);
- assert.match(result.innerHTML,/<strong>300<\/strong> peças previstas/);
+ assert.match(result.innerHTML,/Capacidade para <strong>300<\/strong> peças/);
  assert.match(h.el('plan-detail-result').innerHTML,/MAL-0001[\s\S]*>30<\/td>/);
  assert.doesNotMatch(h.el('plan-detail-result').innerHTML,/scope="rowgroup" rowspan="\d+">20\/11\/2026/);
  end.value='2026-11-16';end.onchange();
  assert.match(result.innerHTML,/Informe uma data inicial válida/);
  start.value='';start.onchange();
- assert.match(result.innerHTML,/<strong>550<\/strong> peças previstas/);
+ assert.match(result.innerHTML,/Capacidade para <strong>1\.000<\/strong> peças/);
  assert.match(result.innerHTML,/16\/11\/2026 a 30\/11\/2026/);
 });
 
@@ -766,7 +766,7 @@ test('opening sewing planning shows the remaining current month at the latest re
  showSewingPlan();`);
  const result=h.el('plan-query-result');
  const daily=h.el('plan-daily');
- assert.match(result.innerHTML,/<strong>2\.880<\/strong> peças previstas/);
+ assert.match(result.innerHTML,/Capacidade para <strong>2\.880<\/strong> peças/);
  assert.match(result.innerHTML,/16\/11\/2026 a 30\/11\/2026/);
  assert.match(h.el('plan-capacity').innerHTML,/320 peças\/dia × 9 dias/);
  assert.equal(daily.value,'320');
@@ -786,11 +786,30 @@ test('opening sewing planning shows the remaining current month at the latest re
  h.el('plan-daily-auto').onclick();
  assert.equal(daily.value,'320');
  assert.equal(h.el('plan-daily-auto').hidden,true);
- assert.match(result.innerHTML,/<strong>2\.880<\/strong> peças previstas/);
+ assert.match(result.innerHTML,/Capacidade para <strong>2\.880<\/strong> peças/);
 
  h.el('plan-output-pieces').value='380';
  h.el('plan-output-form').onsubmit({preventDefault(){}});
  assert.equal(daily.value,'380');
- assert.match(result.innerHTML,/<strong>3\.420<\/strong> peças previstas/);
+ assert.match(result.innerHTML,/Capacidade para <strong>3\.420<\/strong> peças/);
  assert.equal(h.run("loadPlans()['month:2026-11-01'].daily"),undefined);
+});
+
+test('the date filter highlights capacity across months separately from programmed pieces',()=>{
+ const h=harness();
+ h.run("planToday=()=> '2026-11-17'");
+ h.seed({parents:[{id:'p',number:'MAL-0001'}],cuts:[{parentId:'p',pieces:4836}]});
+ h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({
+  'month:2026-11-01':{daily:350,queue:['p']},
+  'month:2026-12-01':{daily:420}
+ }));
+ showSewingPlan();`);
+ const start=h.el('plan-query-start'),end=h.el('plan-query-end'),result=h.el('plan-query-result');
+ start.value='2026-11-17';start.onchange();
+ end.value='2026-12-10';end.onchange();
+ assert.match(result.innerHTML,/Capacidade para <strong>6\.510<\/strong> peças/);
+ assert.match(result.innerHTML,/17\/11\/2026 a 10\/12\/2026/);
+ assert.doesNotMatch(result.innerHTML,/4\.836/);
+ assert.match(h.el('plan-detail-range').textContent,/4\.836 peças programadas/);
+ assert.match(h.el('plan-detail-result').innerHTML,/Vagas na capacidade: 1\.674 peças/);
 });
