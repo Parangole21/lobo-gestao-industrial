@@ -112,7 +112,7 @@
 .indicator-brand-facts dt{font-size:13px;color:#435973}
 .indicator-brand-facts dd{margin:3px 0 0;font-weight:700;overflow-wrap:anywhere}
 #ind-lot-rows h4,#ind-lot-rows p{margin:0 0 6px}
-</style></head><body class="auth-locked"><div class="app"><aside><h2>LOBO <span style="font-weight:400">Industrial</span></h2><p>Gestão de produção • v126</p><div style="font-size:12px;color:#d7e6f6;margin:0 0 14px"><button type="button" onclick="testSupabaseConnection()" style="display:none;width:100%;padding:9px;border:1px solid #6284a8;border-radius:7px;background:#254563;color:white;cursor:pointer">Verificar conexão Supabase</button><div id="supabase-connection-status" role="status" style="display:none;margin-top:7px;line-height:1.4"></div></div><div style="font-size:12px;color:#d7e6f6;margin-bottom:16px"><div id="cloud-auth-status" role="status" style="margin-top:6px">Não autenticado • dados locais preservados</div><div id="cloud-sync-controls" style="display:none;margin-top:12px"><button type="button" onclick="cloudSyncAll()" id="cloud-sync-btn" style="display:none;width:100%;padding:10px;border:1px solid #6284a8;border-radius:7px;background:#19745d;color:white;cursor:pointer">Sincronizar agora</button><div id="cloud-conflict-details" style="display:none;margin-top:10px;padding:10px;background:#20364f;border:1px solid #8fa9c5;border-radius:8px;font-size:12px;overflow-wrap:anywhere"></div><div id="lot-reconcile-result" role="status" style="display:none;margin:8px 0;padding:10px;border:1px solid #adbad0;border-radius:7px;background:#f4f7fd;color:#243654;white-space:pre-wrap;font-size:13px"></div><button id="resolve-test-lots" type="button" onclick="resolveTestLotDeletions()" style="display:none;margin-top:8px;padding:9px;border:1px solid #e3a34a;border-radius:7px;background:#fff4dc;color:#553000;cursor:pointer">Conciliar exclusão dos 3 lotes de teste</button><div id="cloud-sync-message" role="status" style="margin-top:7px;line-height:1.4"></div><div id="sync-problem-banner" role="alert"><strong>Atenção: problema de sincronização</strong><span id="sync-problem-text"></span><button type="button" onclick="dismissSyncProblem()">Fechar aviso</button></div></div></div><div class="nav active" id="nav-lotes" onclick="showPage('lotes')">▤ Lotes de produção</div><div id="lot-sidebar" style="display:none"><div class="subnav" id="lot-nav-cadastro" onclick="document.getElementById('page-materia').style.display='none';document.getElementById('page-lotes').style.display='block';document.getElementById('lot-sidebar').style.display='block';document.getElementById('lot-page-heading').textContent='Cadastro de lote principal';document.getElementById('lot-register-area').style.display='block';document.getElementById('lot-consult-content').style.display='none';document.getElementById('lot-marca-content').style.display='none';document.getElementById('lot-historico-content').style.display='none';document.getElementById('lot-consult-area').style.display='none';document.getElementById('lot-nav-cadastro').classList.add('active');document.getElementById('lot-nav-consulta').classList.remove('active');document.getElementById('lot-nav-marca').classList.remove('active');document.getElementById('lot-nav-historico').classList.remove('active');document.getElementById('nav-materia').classList.remove('active');document.getElementById('nav-lotes').classList.add('active');">Cadastro de lote</div><div class="subnav" id="lot-nav-consulta" onclick="selectedParentOnly=null;document.getElementById('lot-search').value='';renderLots();document.getElementById('page-materia').style.display='none';document.getElementById('page-lotes').style.display='block';document.getElementById('lot-sidebar').style.display='block';document.getElementById('lot-page-heading').textContent='Compras de malha cadastradas';document.getElementById('lot-register-area').style.display='none';document.getElementById('lot-consult-content').style.display='block';document.getElementById('lot-marca-content').style.display='none';document.getElementById('lot-historico-content').style.display='none';document.getElementById('lot-consult-area').style.display='block';document.getElementById('lot-nav-cadastro').classList.remove('active');document.getElementById('lot-nav-consulta').classList.add('active');document.getElementById('lot-nav-marca').classList.remove('active');document.getElementById('lot-nav-historico').classList.remove('active');document.getElementById('nav-materia').classList.remove('active');document.getElementById('nav-lotes').classList.add('active');">Buscar compras de malha</div><div class="subnav" id="lot-nav-marca" onclick="showLotView('marca')">Adicionar marca / previsão</div><div class="subnav" id="lot-nav-historico" onclick="document.getElementById('page-materia').style.display='none';document.getElementById('page-lotes').style.display='block';document.getElementById('lot-sidebar').style.display='block';document.getElementById('lot-page-heading').textContent='Histórico de movimentações';document.getElementById('lot-register-area').style.display='none';document.getElementById('lot-consult-content').style.display='none';document.getElementById('lot-marca-content').style.display='none';document.getElementById('lot-historico-content').style.display='block';document.getElementById('lot-consult-area').style.display='none';document.getElementById('lot-nav-cadastro').classList.remove('active');document.getElementById('lot-nav-consulta').classList.remove('active');document.getElementById('lot-nav-marca').classList.remove('active');document.getElementById('lot-nav-historico').classList.add('active');document.getElementById('nav-materia').classList.remove('active');document.getElementById('nav-lotes').classList.add('active');">Histórico de movimentações</div></div><div class="nav" id="nav-materia" onclick="showPage('materia')">▣ Matéria-prima</div><div class="nav" id="nav-corte" onclick="showCutPage()">✂ Controle de corte</div><div class="nav" id="nav-custos" onclick="showCostPage()">◫ Custos individuais</div><button class="nav plan-nav" type="button" id="nav-planejamento" onclick="showSewingPlan()">▦ Planejamento de costura</button><div class="nav" id="nav-indicadores" onclick="showIndicators()">▥ Indicadores</div><div class="nav lock">⚙ Processos • em desenvolvimento</div><button id="cloud-logout" type="button" onclick="cloudLogout()">Sair da conta</button></aside><main><div id="page-materia"><h1>Recebimento de matéria-prima</h1><p class="sub">Cadastre cada recebimento com as quantidades e o valor total da nota fiscal.</p><section class="stats"><div class="stat"><span>Recebimentos registrados</span><strong id="n">0</strong></div><div class="stat"><span>Kg de malha recebidos</span><strong id="kg">0</strong></div><div class="stat"><span>Valor registrado</span><strong id="sum">R$ 0,00</strong></div></section><section class="panel"><h3 id="formtitle">Novo recebimento</h3><form id="form"><div class="fields"><div><label>Data de recebimento *</label><input type="date" id="date" required></div><div class="full"><label>Compra de malha vinculada *</label><select id="receipt-purchase" required><option value="">Selecione a compra cadastrada</option></select><p class="hint">Vincule o recebimento à compra de malha. Para corrigir uma entrada, edite o recebimento existente.</p></div><div><label>Fornecedor *</label><input id="supplier" placeholder="Nome do fornecedor" list="suppliers" required><datalist id="suppliers"></datalist></div><div><label>Tipo de malha *</label><input id="fabric" placeholder="Ex.: Piquet elastano" list="fabrics" required><datalist id="fabrics"></datalist></div><div><label>Nº da nota fiscal (opcional)</label><input id="invoice" placeholder="Número da NF"></div></div><h3 style="margin:24px 0 8px;font-size:16px">Quantidades recebidas</h3><div class="fields"><div><label>Malha (kg)</label><input type="number" step="0.001" min="0" id="malhakg" placeholder="0"></div><div><label>Gola e punho (kg)</label><input type="number" step="0.001" min="0" id="golakg" placeholder="0"></div><div><label>Ribana (kg)</label><input type="number" step="0.001" min="0" id="ribanakg" placeholder="0"></div><div><label>Valor total da nota fiscal (R$) *</label><input type="number" step="0.01" min="0" id="invoiceTotal" placeholder="0,00" required></div></div><p class="hint">Informe apenas as quantidades e o valor total da nota. Não é necessário lançar preços individuais.</p><div class="fields" style="margin-top:18px"><div class="full"><label>Observações</label><textarea id="notes" placeholder="Informações adicionais sobre o recebimento"></textarea></div></div><div class="row" style="justify-content:space-between;margin-top:17px"><div>Valor total da nota: <span class="total" id="preview">R$ 0,00</span></div><div class="row"><button class="btn secondary" type="button" id="reset">Limpar</button><button class="btn" type="submit" id="save">Salvar recebimento</button></div></div></form></section><section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:15px"><h3 style="margin:0">Histórico de recebimentos</h3><div class="row"><button class="btn secondary" id="export" type="button">Exportar backup JSON</button><label class="btn secondary" style="cursor:pointer;margin:0">Importar backup<input type="file" id="import" accept="application/json" hidden></label></div></div><input id="search" placeholder="Buscar fornecedor, malha ou nota fiscal" style="margin-bottom:14px"><div class="tablewrap"><table><thead><tr><th>Data</th><th>Fornecedor</th><th>Tipo de malha</th><th>NF</th><th>Malha (kg)</th><th>Total</th><th>Ações</th></tr></thead><tbody id="rows"></tbody></table></div></section></div><section id="page-planejamento" class="sew-plan" style="display:none" aria-labelledby="plan-heading">
+</style></head><body class="auth-locked"><div class="app"><aside><h2>LOBO <span style="font-weight:400">Industrial</span></h2><p>Gestão de produção • v127</p><div style="font-size:12px;color:#d7e6f6;margin:0 0 14px"><button type="button" onclick="testSupabaseConnection()" style="display:none;width:100%;padding:9px;border:1px solid #6284a8;border-radius:7px;background:#254563;color:white;cursor:pointer">Verificar conexão Supabase</button><div id="supabase-connection-status" role="status" style="display:none;margin-top:7px;line-height:1.4"></div></div><div style="font-size:12px;color:#d7e6f6;margin-bottom:16px"><div id="cloud-auth-status" role="status" style="margin-top:6px">Não autenticado • dados locais preservados</div><div id="cloud-sync-controls" style="display:none;margin-top:12px"><button type="button" onclick="cloudSyncAll()" id="cloud-sync-btn" style="display:none;width:100%;padding:10px;border:1px solid #6284a8;border-radius:7px;background:#19745d;color:white;cursor:pointer">Sincronizar agora</button><div id="cloud-conflict-details" style="display:none;margin-top:10px;padding:10px;background:#20364f;border:1px solid #8fa9c5;border-radius:8px;font-size:12px;overflow-wrap:anywhere"></div><div id="lot-reconcile-result" role="status" style="display:none;margin:8px 0;padding:10px;border:1px solid #adbad0;border-radius:7px;background:#f4f7fd;color:#243654;white-space:pre-wrap;font-size:13px"></div><button id="resolve-test-lots" type="button" onclick="resolveTestLotDeletions()" style="display:none;margin-top:8px;padding:9px;border:1px solid #e3a34a;border-radius:7px;background:#fff4dc;color:#553000;cursor:pointer">Conciliar exclusão dos 3 lotes de teste</button><div id="cloud-sync-message" role="status" style="margin-top:7px;line-height:1.4"></div><div id="sync-problem-banner" role="alert"><strong>Atenção: problema de sincronização</strong><span id="sync-problem-text"></span><button type="button" onclick="dismissSyncProblem()">Fechar aviso</button></div></div></div><div class="nav active" id="nav-lotes" onclick="showPage('lotes')">▤ Lotes de produção</div><div id="lot-sidebar" style="display:none"><div class="subnav" id="lot-nav-cadastro" onclick="document.getElementById('page-materia').style.display='none';document.getElementById('page-lotes').style.display='block';document.getElementById('lot-sidebar').style.display='block';document.getElementById('lot-page-heading').textContent='Cadastro de lote principal';document.getElementById('lot-register-area').style.display='block';document.getElementById('lot-consult-content').style.display='none';document.getElementById('lot-marca-content').style.display='none';document.getElementById('lot-historico-content').style.display='none';document.getElementById('lot-consult-area').style.display='none';document.getElementById('lot-nav-cadastro').classList.add('active');document.getElementById('lot-nav-consulta').classList.remove('active');document.getElementById('lot-nav-marca').classList.remove('active');document.getElementById('lot-nav-historico').classList.remove('active');document.getElementById('nav-materia').classList.remove('active');document.getElementById('nav-lotes').classList.add('active');">Cadastro de lote</div><div class="subnav" id="lot-nav-consulta" onclick="selectedParentOnly=null;document.getElementById('lot-search').value='';renderLots();document.getElementById('page-materia').style.display='none';document.getElementById('page-lotes').style.display='block';document.getElementById('lot-sidebar').style.display='block';document.getElementById('lot-page-heading').textContent='Compras de malha cadastradas';document.getElementById('lot-register-area').style.display='none';document.getElementById('lot-consult-content').style.display='block';document.getElementById('lot-marca-content').style.display='none';document.getElementById('lot-historico-content').style.display='none';document.getElementById('lot-consult-area').style.display='block';document.getElementById('lot-nav-cadastro').classList.remove('active');document.getElementById('lot-nav-consulta').classList.add('active');document.getElementById('lot-nav-marca').classList.remove('active');document.getElementById('lot-nav-historico').classList.remove('active');document.getElementById('nav-materia').classList.remove('active');document.getElementById('nav-lotes').classList.add('active');">Buscar compras de malha</div><div class="subnav" id="lot-nav-marca" onclick="showLotView('marca')">Adicionar marca / previsão</div><div class="subnav" id="lot-nav-historico" onclick="document.getElementById('page-materia').style.display='none';document.getElementById('page-lotes').style.display='block';document.getElementById('lot-sidebar').style.display='block';document.getElementById('lot-page-heading').textContent='Histórico de movimentações';document.getElementById('lot-register-area').style.display='none';document.getElementById('lot-consult-content').style.display='none';document.getElementById('lot-marca-content').style.display='none';document.getElementById('lot-historico-content').style.display='block';document.getElementById('lot-consult-area').style.display='none';document.getElementById('lot-nav-cadastro').classList.remove('active');document.getElementById('lot-nav-consulta').classList.remove('active');document.getElementById('lot-nav-marca').classList.remove('active');document.getElementById('lot-nav-historico').classList.add('active');document.getElementById('nav-materia').classList.remove('active');document.getElementById('nav-lotes').classList.add('active');">Histórico de movimentações</div></div><div class="nav" id="nav-materia" onclick="showPage('materia')">▣ Matéria-prima</div><div class="nav" id="nav-corte" onclick="showCutPage()">✂ Controle de corte</div><div class="nav" id="nav-custos" onclick="showCostPage()">◫ Custos individuais</div><button class="nav plan-nav" type="button" id="nav-planejamento" onclick="showSewingPlan()">▦ Planejamento de costura</button><div class="nav" id="nav-indicadores" onclick="showIndicators()">▥ Indicadores</div><div class="nav lock">⚙ Processos • em desenvolvimento</div><button id="cloud-logout" type="button" onclick="cloudLogout()">Sair da conta</button></aside><main><div id="page-materia"><h1>Recebimento de matéria-prima</h1><p class="sub">Cadastre cada recebimento com as quantidades e o valor total da nota fiscal.</p><section class="stats"><div class="stat"><span>Recebimentos registrados</span><strong id="n">0</strong></div><div class="stat"><span>Kg de malha recebidos</span><strong id="kg">0</strong></div><div class="stat"><span>Valor registrado</span><strong id="sum">R$ 0,00</strong></div></section><section class="panel"><h3 id="formtitle">Novo recebimento</h3><form id="form"><div class="fields"><div><label>Data de recebimento *</label><input type="date" id="date" required></div><div class="full"><label>Compra de malha vinculada *</label><select id="receipt-purchase" required><option value="">Selecione a compra cadastrada</option></select><p class="hint">Vincule o recebimento à compra de malha. Para corrigir uma entrada, edite o recebimento existente.</p></div><div><label>Fornecedor *</label><input id="supplier" placeholder="Nome do fornecedor" list="suppliers" required><datalist id="suppliers"></datalist></div><div><label>Tipo de malha *</label><input id="fabric" placeholder="Ex.: Piquet elastano" list="fabrics" required><datalist id="fabrics"></datalist></div><div><label>Nº da nota fiscal (opcional)</label><input id="invoice" placeholder="Número da NF"></div></div><h3 style="margin:24px 0 8px;font-size:16px">Quantidades recebidas</h3><div class="fields"><div><label>Malha (kg)</label><input type="number" step="0.001" min="0" id="malhakg" placeholder="0"></div><div><label>Gola e punho (kg)</label><input type="number" step="0.001" min="0" id="golakg" placeholder="0"></div><div><label>Ribana (kg)</label><input type="number" step="0.001" min="0" id="ribanakg" placeholder="0"></div><div><label>Valor total da nota fiscal (R$) *</label><input type="number" step="0.01" min="0" id="invoiceTotal" placeholder="0,00" required></div></div><p class="hint">Informe apenas as quantidades e o valor total da nota. Não é necessário lançar preços individuais.</p><div class="fields" style="margin-top:18px"><div class="full"><label>Observações</label><textarea id="notes" placeholder="Informações adicionais sobre o recebimento"></textarea></div></div><div class="row" style="justify-content:space-between;margin-top:17px"><div>Valor total da nota: <span class="total" id="preview">R$ 0,00</span></div><div class="row"><button class="btn secondary" type="button" id="reset">Limpar</button><button class="btn" type="submit" id="save">Salvar recebimento</button></div></div></form></section><section class="panel"><div class="row" style="justify-content:space-between;margin-bottom:15px"><h3 style="margin:0">Histórico de recebimentos</h3><div class="row"><button class="btn secondary" id="export" type="button">Exportar backup JSON</button><label class="btn secondary" style="cursor:pointer;margin:0">Importar backup<input type="file" id="import" accept="application/json" hidden></label></div></div><input id="search" placeholder="Buscar fornecedor, malha ou nota fiscal" style="margin-bottom:14px"><div class="tablewrap"><table><thead><tr><th>Data</th><th>Fornecedor</th><th>Tipo de malha</th><th>NF</th><th>Malha (kg)</th><th>Total</th><th>Ações</th></tr></thead><tbody id="rows"></tbody></table></div></section></div><section id="page-planejamento" class="sew-plan" style="display:none" aria-labelledby="plan-heading">
  <header class="plan-hero">
   <h1 id="plan-heading">Planejamento de costura</h1>
   <p>Organize a fila de lotes conforme o estoque e a capacidade do período.</p>
@@ -127,7 +127,7 @@
    <button class="btn secondary" type="button" id="plan-daily-auto" hidden>Usar meta anterior</button>
   </form>
   </div>
-  <p class="hint" id="plan-daily-source"></p>
+  <p class="hint" id="plan-daily-source"></p><p class="hint" id="plan-cloud-status" role="status">Entre na conta para verificar o salvamento na nuvem.</p><details id="plan-cloud-conflicts" hidden><summary>Conferir alterações do planejamento</summary><div id="plan-cloud-conflict-list"></div></details>
   <p class="plan-message" id="plan-message" role="status"></p>
   <div class="plan-fields plan-period-fields">
    <label>Data inicial<input id="plan-query-start" type="date"></label>
@@ -172,7 +172,7 @@
   <h3 class="plan-month-heading">Resumo do mês</h3>
   <div id="plan-capacity" class="plan-metrics"></div>
   <div id="plan-stock" class="plan-stock"></div>
-  <p class="hint plan-footnote">A capacidade usa a meta diária salva e os dias de produção. Os lançamentos realizados não alteram a meta; os dias já lançados saem dos dias restantes. O estoque é atualizado pelos registros de corte e pelas etapas dos lotes. Os dados do planejamento ficam salvos neste navegador.</p>
+  <p class="hint plan-footnote">A capacidade usa a meta diária salva e os dias de produção. Os lançamentos realizados não alteram a meta; os dias já lançados saem dos dias restantes. O estoque é atualizado pelos registros de corte e pelas etapas dos lotes. As alterações são salvas neste computador e sincronizadas com a nuvem. Confira o estado de salvamento em Capacidade do período.</p>
  </section>
  </div>
  <section class="panel plan-panel" id="plan-details" hidden aria-labelledby="plan-detail-heading">
@@ -190,7 +190,7 @@
  <div id="cost-saved-list" class="cost-saved-list"></div>
 </section>
 </div><div id="page-corte" style="display:none"><h1>Controle de corte</h1><p class="sub">Selecione uma malha recebida e informe a quantidade de peças cortadas.</p><section class="panel"><h3 id="cut-form-title">Novo lançamento de corte</h3><form id="cut-form"><div class="fields"><div><label>Data do corte *</label><input id="cut-date" type="date" required></div><div class="wide"><label>Malha recebida *</label><select id="cut-parent" required></select><p class="hint" id="cut-stock-info">Selecione uma malha para consultar o estoque disponível para corte.</p></div><div class="wide"><p class="hint">As peças cortadas ficarão disponíveis para distribuir entre as marcas cadastradas neste lote.</p></div><div><label>Malha utilizada (kg) *</label><input id="cut-kg" type="number" min="0.001" step="0.001" required></div><div><label>Peças cortadas *</label><input id="cut-pieces" type="number" min="1" step="1" required></div><div><label>Tipo de corte</label><select id="cut-type"><option>Interno</option><option>Terceirizado</option></select></div><div><label>Responsável</label><input id="cut-worker"></div><div class="full"><label>Observações</label><textarea id="cut-notes"></textarea></div></div><div class="row" style="margin-top:16px"><button type="button" class="btn secondary" id="cut-clear">Limpar</button><button type="submit" class="btn" id="cut-save">Salvar corte</button></div></form><p class="hint" id="cut-message" aria-live="polite"></p></section><section class="panel"><h3>Peças cortadas e disponíveis por lote</h3><div id="cut-summary"></div></section><section class="panel"><h3>Histórico de cortes</h3><div id="cut-list"></div></section></div><div id="page-lotes" style="display:none"><h1 id="lot-page-heading">Cadastro de lote principal</h1><p class="sub" id="lot-page-description">Registre a compra da malha e as datas do pedido.</p><div id="system-error" role="alert" style="display:none;background:#ffe9e9;color:#8c1717;padding:14px;margin-bottom:12px;border-radius:8px"></div><div id="lot-save-message" role="status" style="display:none;background:#e9f7ee;color:#17623d;border:1px solid #b9e4c8;border-radius:9px;padding:13px;margin-bottom:16px"></div><div class="alert">Dados compartilhados pela nuvem. Acompanhe o estado da sincronização no menu lateral.</div><div id="lot-consult-area" style="display:none"><section class="stats"><div class="stat"><span>Lotes principais</span><strong id="parent-count">0</strong></div><div class="stat"><span>Malha nos lotes</span><strong id="parent-kg">0 kg</strong></div><div class="stat"><span>Notas fiscais informadas</span><strong id="lot-pieces">0</strong></div></section></div><div id="lot-register-area"><section class="panel"><h3 id="parent-title">Novo lote principal de malha</h3><form id="parent-form" onsubmit="event.preventDefault();return false"><div class="fields"><div><label>Número do lote</label><input id="parent-number" readonly></div><div><label>Quantidade total de malha (kg) *</label><input id="parent-kg-input" type="number" min="0.001" step="0.001" required></div><div><label>Marca / fabricante da malha *</label><input id="parent-fabric-brand" required placeholder="Ex.: Marca da malha"></div><div><label>Número da nota fiscal</label><input id="parent-invoice" placeholder="Se disponível"></div><div><label>Valor total do pedido (R$)</label><input id="parent-order-value" type="number" min="0" step="0.01" placeholder="0,00"></div>
-<div><label for="parent-simulated-pieces">Peças simuladas (opcional)</label><input id="parent-simulated-pieces" type="number" min="1" max="100000000" step="1" inputmode="numeric"><p class="hint">Rendimento previsto do lote para o planejamento de costura.</p></div></div><div class="date-list"><div class="date-line"><label for="parent-ordered">Data do pedido</label><input id="parent-ordered" type="date"><label class="date-check"><input type="checkbox" id="parent-ordered-done"><span>Realizado</span></label></div><div class="date-line"><label for="parent-billed">Data do faturamento</label><input id="parent-billed" type="date"><label class="date-check"><input type="checkbox" id="parent-billed-done"><span>Realizado</span></label></div><div class="date-line"><label for="parent-expected">Previsão de entrega</label><input id="parent-expected" type="date"><label class="date-check"><input type="checkbox" id="parent-expected-done"><span>Definida</span></label></div><div class="date-line"><label for="parent-delivered">Data da entrega</label><input id="parent-delivered" type="date"><label class="date-check"><input type="checkbox" id="parent-delivered-done"><span>Realizado</span></label></div></div><div class="fields" style="margin-top:16px"><div class="full"><label>Observações</label><textarea id="parent-notes"></textarea></div></div><p class="hint">Marque a confirmação quando a etapa acontecer. As datas podem permanecer em branco; a previsão de entrega é apenas uma estimativa, não confirma o recebimento.</p><div class="row" style="justify-content:flex-end;margin-top:16px"><button type="button" class="btn secondary" id="parent-reset">Limpar</button><button class="btn" type="submit" id="parent-save">Salvar lote principal</button></div></form></section></div><div id="lot-consult-content" style="display:none"><section class="panel"><h3>Compras de malha cadastradas</h3><p class="hint">Consulte aqui os lançamentos de Cadastro de lote. Marcas de roupa e produção são gerenciadas em Adicionar marca / previsão.</p><div class="row" style="margin-bottom:14px"><button class="btn secondary" type="button" id="lot-export">Exportar backup completo</button><label class="btn secondary" style="cursor:pointer;margin:0">Importar backup<input type="file" id="lot-import" accept="application/json" hidden></label></div><input id="lot-search" placeholder="Buscar por lote, fabricante da malha ou nota fiscal" style="margin-bottom:14px"><div id="parent-list"></div></section></div><div id="lot-marca-content" style="display:none"><section class="panel" id="child-panel"><h3 id="child-title">Adicionar marca ao lote</h3><p class="hint" id="child-parent-name">Selecione “Adicionar marca” em um lote principal acima.</p><form id="child-form" onsubmit="event.preventDefault();return false"><div class="fields"><div class="full"><label for="child-parent-select">Malha recebida / lote de corte *</label><select id="child-parent-select" required><option value="">Selecione um lote principal</option></select></div><div><label>Marca da roupa *</label><input id="child-brand" required list="child-brands"><datalist id="child-brands"></datalist></div><div><label>Cliente *</label><input id="child-client" required list="child-clients"><datalist id="child-clients"></datalist></div><div><label>Modelo *</label><input id="child-model" required list="child-models"><datalist id="child-models"></datalist></div><div><label>Quantidade de peças da marca *</label><input id="child-quantity" type="number" min="1" step="1" required></div><div><label for="child-status">Processo atual *</label><select id="child-status"><option>Corte</option><option>Costura</option><option>Serigrafia</option><option>Bordado</option><option>Casa</option><option>Botão</option><option>Limpeza</option><option>Embalagem</option><option>Estoque</option><option>Entregue</option><option>Parado</option><option>Separação</option></select></div><div class="full"><p class="hint" id="child-piece-availability">Selecione uma compra de malha para consultar as peças cortadas disponíveis.</p></div><div class="full production-dates"><h4>Previsão de produção da marca</h4><div class="fields"><div><label for="child-start">Início previsto da produção</label><input id="child-start" type="date"></div><div><label for="child-end">Fim previsto da produção</label><input id="child-end" type="date"></div></div><p class="hint">Datas opcionais. Podem ser preenchidas ou alteradas posteriormente.</p></div><div class="full"><label>Observações</label><textarea id="child-notes"></textarea></div></div><div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn secondary" type="button" id="child-reset">Limpar</button><button class="btn" type="submit" id="child-save">Salvar marca</button></div></form></section><section class="panel"><h3>Marcas cadastradas</h3><div id="child-saved-list"></div></section></div><div id="lot-historico-content" style="display:none"><section class="panel"><h3>Histórico de movimentações</h3><p class="hint">Consulte as etapas percorridas, o tempo em cada setor e os prazos de produção.</p><label for="history-search">Buscar no histórico</label><input id="history-search" type="search" placeholder="Código MAL, nota fiscal, marca ou cliente"><div id="lot-history"></div></section></div></div></main></div><div id="cloud-login-modal" role="dialog" aria-modal="true" aria-label="Entrar no Lobo Gestão Industrial" style="display:flex;position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#102842,#1c4666);align-items:center;justify-content:center;padding:18px"><form id="cloud-login-form" style="width:100%;max-width:410px;background:white;border-radius:15px;padding:32px;box-shadow:0 18px 55px #071b3440"><div class="login-brand">LOBO <span style="font-weight:400">Industrial</span></div><p class="login-subtitle">Gestão industrial · Acesse sua conta</p><label for="cloud-email">E-mail</label><input id="cloud-email" type="email" required autocomplete="username" autofocus><label for="cloud-password">Senha</label><input id="cloud-password" type="password" required autocomplete="current-password"><p id="cloud-login-message" role="status" style="font-size:13px;color:#9b2c2c;min-height:18px"></p><button id="cloud-login-submit" class="btn" type="submit">Entrar no sistema</button></form></div><script>
+<div><label for="parent-simulated-pieces">Peças simuladas (opcional)</label><input id="parent-simulated-pieces" type="number" min="1" max="100000000" step="1" inputmode="numeric"><p class="hint">Rendimento previsto do lote para o planejamento de costura.</p></div></div><div class="date-list"><div class="date-line"><label for="parent-ordered">Data do pedido</label><input id="parent-ordered" type="date"><label class="date-check"><input type="checkbox" id="parent-ordered-done"><span>Realizado</span></label></div><div class="date-line"><label for="parent-billed">Data do faturamento</label><input id="parent-billed" type="date"><label class="date-check"><input type="checkbox" id="parent-billed-done"><span>Realizado</span></label></div><div class="date-line"><label for="parent-expected">Previsão de entrega</label><input id="parent-expected" type="date"><label class="date-check"><input type="checkbox" id="parent-expected-done"><span>Definida</span></label></div><div class="date-line"><label for="parent-delivered">Data da entrega</label><input id="parent-delivered" type="date"><label class="date-check"><input type="checkbox" id="parent-delivered-done"><span>Realizado</span></label></div></div><div class="fields" style="margin-top:16px"><div class="full"><label>Observações</label><textarea id="parent-notes"></textarea></div></div><p class="hint">Marque a confirmação quando a etapa acontecer. As datas podem permanecer em branco; a previsão de entrega é apenas uma estimativa, não confirma o recebimento.</p><div class="row" style="justify-content:flex-end;margin-top:16px"><button type="button" class="btn secondary" id="parent-reset">Limpar</button><button class="btn" type="submit" id="parent-save">Salvar lote principal</button></div></form></section></div><div id="lot-consult-content" style="display:none"><section class="panel"><h3>Compras de malha cadastradas</h3><p class="hint">Consulte aqui os lançamentos de Cadastro de lote. Marcas de roupa e produção são gerenciadas em Adicionar marca / previsão.</p><div class="row" style="margin-bottom:14px"><button class="btn secondary" type="button" id="lot-export">Exportar backup completo</button><label class="btn secondary" style="cursor:pointer;margin:0">Importar backup<input type="file" id="lot-import" accept="application/json" hidden></label></div><input id="lot-search" placeholder="Buscar por lote, fabricante da malha ou nota fiscal" style="margin-bottom:14px"><div id="parent-list"></div></section></div><div id="lot-marca-content" style="display:none"><section class="panel" id="child-panel"><h3 id="child-title">Adicionar marca ao lote</h3><p class="hint" id="child-parent-name">Selecione “Adicionar marca” em um lote principal acima.</p><form id="child-form" onsubmit="event.preventDefault();return false"><div class="fields"><div class="full"><label for="child-parent-select">Malha recebida / lote de corte *</label><select id="child-parent-select" required><option value="">Selecione um lote principal</option></select></div><div><label>Marca da roupa *</label><input id="child-brand" required list="child-brands"><datalist id="child-brands"></datalist></div><div><label>Cliente *</label><input id="child-client" required list="child-clients"><datalist id="child-clients"></datalist></div><div><label>Modelo *</label><input id="child-model" required list="child-models"><datalist id="child-models"></datalist></div><div><label>Quantidade de peças da marca *</label><input id="child-quantity" type="number" min="1" step="1" required></div><div><label for="child-status">Processo atual *</label><select id="child-status"><option>Corte</option><option>Costura</option><option>Serigrafia</option><option>Bordado</option><option>Casa</option><option>Botão</option><option>Limpeza</option><option>Embalagem</option><option>Estoque</option><option>Entregue</option><option>Parado</option><option>Separação</option></select></div><div class="full"><p class="hint" id="child-piece-availability">Selecione uma compra de malha para consultar as peças cortadas disponíveis.</p></div><div class="full production-dates"><h4>Previsão de produção da marca</h4><div class="fields"><div><label for="child-start">Início previsto da produção</label><input id="child-start" type="date"></div><div><label for="child-end">Fim previsto da produção</label><input id="child-end" type="date"></div></div><p class="hint">Datas opcionais. Podem ser preenchidas ou alteradas posteriormente.</p></div><div class="full"><label>Observações</label><textarea id="child-notes"></textarea></div></div><div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn secondary" type="button" id="child-reset">Limpar</button><button class="btn" type="submit" id="child-save">Salvar marca</button></div></form></section><section class="panel"><h3>Marcas cadastradas</h3><div id="child-saved-list"></div></section></div><div id="lot-historico-content" style="display:none"><section class="panel"><h3>Histórico de movimentações</h3><p class="hint">Consulte as etapas percorridas, o tempo em cada setor e os prazos de produção.</p><label for="history-search">Buscar no histórico</label><input id="history-search" type="search" placeholder="Código MAL, nota fiscal, marca ou cliente"><div id="lot-history"></div></section></div></div></main></div><div id="cloud-login-modal" role="dialog" aria-modal="true" aria-label="Entrar no Lobo Gestão Industrial" style="display:flex;position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#102842,#1c4666);align-items:center;justify-content:center;padding:18px"><form id="cloud-login-form" style="width:100%;max-width:410px;background:white;border-radius:15px;padding:32px;box-shadow:0 18px 55px #071b3440"><div class="login-brand">LOBO <span style="font-weight:400">Industrial</span></div><p class="login-subtitle">Gestão industrial · Acesse sua conta</p><label for="cloud-email">E-mail</label><input id="cloud-email" type="email" required autocomplete="username" autofocus><label for="cloud-password">Senha</label><div class="row" style="flex-wrap:nowrap"><input id="cloud-password" type="password" required autocomplete="current-password"><button id="cloud-password-toggle" class="btn secondary" type="button" aria-label="Mostrar senha">👁</button></div><button id="cloud-recover" class="btn secondary" type="button" style="padding:4px 0;background:none;font-size:13px;text-decoration:underline">Recuperar senha</button><p id="cloud-login-message" role="status" style="font-size:13px;color:#9b2c2c;min-height:18px"></p><button id="cloud-login-submit" class="btn" type="submit">Entrar no sistema</button></form><form id="cloud-reset-form" hidden style="width:100%;max-width:410px;background:white;border-radius:15px;padding:32px;box-shadow:0 18px 55px #071b3440"><div class="login-brand">Nova senha</div><p>Crie uma senha para entrar no sistema.</p><label for="cloud-new-password">Nova senha</label><input id="cloud-new-password" type="password" autocomplete="new-password" minlength="8" required><label for="cloud-confirm-password">Confirmar nova senha</label><input id="cloud-confirm-password" type="password" autocomplete="new-password" minlength="8" required><p id="cloud-reset-message" role="status"></p><button id="cloud-reset-save" class="btn" type="submit">Salvar nova senha</button></form></div><script>
 const SUPABASE_PROJECT_URL='https://yldgebyfflbacicsfseh.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_5GCZ1S_XsQXLfmJbn94WmA_hINR9q38';
 let cloudSession=null;
@@ -202,7 +202,7 @@ async function ensureCloudSession(){
  if(cloudRefreshPending)return cloudRefreshPending;
  cloudRefreshPending=(async()=>{
   if(!cloudSession?.refresh_token)throw Error('A sessão expirou e não pode ser renovada.');
-  const response=await fetch(SUPABASE_PROJECT_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:cloudSession.refresh_token}),cache:'no-store'});
+  const response=await cloudFetch(SUPABASE_PROJECT_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:cloudSession.refresh_token}),cache:'no-store'});
   const data=await response.json();
   if(!response.ok||!data.access_token){const error=new Error('Não foi possível renovar sua sessão.');error.invalidSession=response.status===400||response.status===401;throw error;}
   cloudSession={...cloudSession,access_token:data.access_token,refresh_token:data.refresh_token||cloudSession.refresh_token,expires_at:Date.now()+Number(data.expires_in||3600)*1000};
@@ -235,22 +235,22 @@ new MutationObserver(refreshCloudSyncAlert).observe(cloudSyncMessageElement,{chi
 refreshCloudSyncAlert();
 function cloudAuthStatus(message){document.getElementById('cloud-auth-status').textContent=message;document.getElementById('cloud-logout').style.display=cloudSession?'inline-block':'none';document.getElementById('cloud-sync-controls').style.display=cloudSession?'block':'none';}
 async function cloudLogout(){
- if(cloudSyncInProgress||cloudLotsBusy||cloudCutsBusy||cloudCostsBusy){alert('Há uma sincronização em andamento. Tente sair novamente quando terminar.');return}
- const token=cloudSession?.access_token;cloudSession=null;cloudAuthStatus('Não autenticado');openCloudLogin();
- if(token){try{await fetch(SUPABASE_PROJECT_URL+'/auth/v1/logout',{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+token}});}catch(e){}}
+ if(cloudSyncCycleRunning||cloudSyncInProgress||cloudLotsBusy||cloudCutsBusy||cloudCostsBusy||cloudPlanningBusy){alert('Há uma sincronização em andamento. Tente sair novamente quando terminar.');return}
+ const token=cloudSession?.access_token;cloudSession=null;planningConflicts.clear();renderPlanningConflicts();cloudAuthStatus('Não autenticado');openCloudLogin();
+ if(token){try{await cloudFetch(SUPABASE_PROJECT_URL+'/auth/v1/logout?scope=local',{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+token}});}catch(e){}}
 }
 document.getElementById('cloud-login-form').addEventListener('submit',async function(e){
  e.preventDefault();const msg=document.getElementById('cloud-login-message'),btn=document.getElementById('cloud-login-submit');
  btn.disabled=true;msg.textContent='Autenticando...';
  try{
-  const response=await fetch(SUPABASE_PROJECT_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('cloud-email').value.trim(),password:document.getElementById('cloud-password').value})});
-  const data=await response.json();if(!response.ok||!data.access_token)throw Error(response.status===400?'E-mail ou senha inválidos, ou conta ainda não confirmada.':data.msg||data.error_description||data.message||'Falha no login');
-  const profileResponse=await fetch(SUPABASE_PROJECT_URL+'/rest/v1/profiles?select=user_id,full_name,role,active&user_id=eq.'+encodeURIComponent(data.user.id),{headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+data.access_token,Accept:'application/json'}});
-  if(!profileResponse.ok){msg.textContent='Login válido, mas sem permissão para consultar o perfil (HTTP '+profileResponse.status+'). Confira as políticas RLS da tabela profiles.';return;}
+  const response=await cloudFetch(SUPABASE_PROJECT_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('cloud-email').value.trim(),password:document.getElementById('cloud-password').value})});
+  const data=await response.json();if(!response.ok||!data.access_token)throw Error(authErrorMessage(response,data));
+  const profileResponse=await cloudFetch(SUPABASE_PROJECT_URL+'/rest/v1/profiles?select=user_id,full_name,role,active&user_id=eq.'+encodeURIComponent(data.user.id),{headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+data.access_token,Accept:'application/json'}});
+  if(!profileResponse.ok){msg.textContent='Login confirmado, mas não foi possível carregar a permissão da conta (HTTP '+profileResponse.status+'). Solicite a verificação ao responsável pelo sistema.';return;}
   const profiles=await profileResponse.json();const profile=Array.isArray(profiles)?profiles[0]:null;
   if(!profile||profile.active!==true){msg.textContent='Login válido, mas o perfil não está ativo ou não foi encontrado.';return;}
   cloudSession={access_token:data.access_token,refresh_token:data.refresh_token||null,expires_at:Date.now()+Number(data.expires_in||3600)*1000,user_id:data.user.id,role:profile.role};
-  cloudAuthStatus('Conectado: '+(profile.full_name||data.user.email));
+  planningConflicts.clear();renderPlanningConflicts();cloudAuthStatus('Conectado: '+(profile.full_name||data.user.email));
   msg.textContent='Carregando dados compartilhados...';
   await cloudSyncAll(true);
   closeCloudLogin();
@@ -260,7 +260,7 @@ async function testSupabaseConnection(){
  const status=document.getElementById('supabase-connection-status');
  status.textContent='Verificando acesso ao projeto...';
  try{
-  const response=await fetch(SUPABASE_PROJECT_URL+'/rest/v1/profiles?select=user_id&limit=0',{
+  const response=await cloudFetch(SUPABASE_PROJECT_URL+'/rest/v1/profiles?select=user_id&limit=0',{
    method:'GET',
    headers:{'apikey':SUPABASE_PUBLISHABLE_KEY,'Accept':'application/json'},
    cache:'no-store'
@@ -294,7 +294,7 @@ async function cloudMaterialsRequest(table,method,body){
  const rows=[],pageSize=500,order=table==='lot_costs'?'lot_id':'id';
  for(let offset=0;;offset+=pageSize){
   const query=method==='GET'?'?select=*&order='+order+'.asc&limit='+pageSize+'&offset='+offset:'';
-  const response=await fetch(SUPABASE_PROJECT_URL+'/rest/v1/'+table+query,{
+  const response=await cloudFetch(SUPABASE_PROJECT_URL+'/rest/v1/'+table+query,{
    method,headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,
     'Content-Type':'application/json',Accept:'application/json',...(method==='POST'?{Prefer:'return=minimal'}:{})},
    ...(body?{body:JSON.stringify(body)}:{}),cache:'no-store'
@@ -319,7 +319,7 @@ async function deleteSyncedMaterial(table,item){
    if(remoteCosts.some(r=>hasCostEntries(r.data)))throw Error('Este lote possui custos na nuvem. Revise a apuração antes de excluir o lote.');
    for(const row of remoteCosts){
     localStorage.setItem('lobo-exclusao-backup-custo-vazio-'+id+'-'+Date.now(),JSON.stringify(row.data));
-    const response=await fetch(SUPABASE_PROJECT_URL+'/rest/v1/lot_costs?lot_id=eq.'+encodeURIComponent(id)+'&updated_at=eq.'+encodeURIComponent(row.updated_at),{method:'DELETE',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,Prefer:'return=representation'},cache:'no-store'});
+    const response=await cloudFetch(SUPABASE_PROJECT_URL+'/rest/v1/lot_costs?lot_id=eq.'+encodeURIComponent(id)+'&updated_at=eq.'+encodeURIComponent(row.updated_at),{method:'DELETE',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,Prefer:'return=representation'},cache:'no-store'});
     if(!response.ok||(await response.json()).length!==1)throw Error('O custo do lote mudou em outro computador. Atualize antes de excluir.');
    }
   }
@@ -327,7 +327,7 @@ async function deleteSyncedMaterial(table,item){
   if(row){
    if(cloudLotJson(row.data)!==cloudLotJson(item)){alert('O registro foi alterado em outro computador. Sincronize antes de excluir para evitar perda de dados.');return false}
    const url=SUPABASE_PROJECT_URL+'/rest/v1/'+table+'?id=eq.'+encodeURIComponent(id)+'&updated_at=eq.'+encodeURIComponent(row.updated_at);
-   const response=await fetch(url,{method:'DELETE',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,Prefer:'return=representation'},cache:'no-store'});
+   const response=await cloudFetch(url,{method:'DELETE',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,Prefer:'return=representation'},cache:'no-store'});
    if(!response.ok){let detail='';try{detail=(await response.json()).message||''}catch(e){}throw Error('HTTP '+response.status+' '+detail)}
    const deleted=await response.json();if(deleted.length!==1)throw Error('O registro foi alterado durante a exclusão. Sincronize e tente novamente.');
    // Confirmar com uma nova leitura da nuvem: resposta DELETE isolada não basta.
@@ -577,7 +577,7 @@ async function cloudSyncMaterials(automatic=false){
    const url=SUPABASE_PROJECT_URL+'/rest/v1/'+u.table+'?id=eq.'+encodeURIComponent(String(u.item.id))+'&updated_at=eq.'+encodeURIComponent(u.row.updated_at);
    const payload={data:u.item,updated_at:new Date().toISOString(),updated_by:cloudSession.user_id};
    if(u.section==='receipts')payload.purchase_id=u.item.purchaseId||null;
-   const response=await fetch(url,{method:'PATCH',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(payload),cache:'no-store'});
+   const response=await cloudFetch(url,{method:'PATCH',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(payload),cache:'no-store'});
    if(!response.ok)throw Error('Falha ao atualizar '+u.table+': HTTP '+response.status);
    const rows=await response.json();if(rows.length!==1)throw Error('Alteração simultânea no registro '+u.item.id);
    next[u.section][String(u.item.id)]=cloudLotJson(u.item);
@@ -637,7 +637,7 @@ function renderAfterLotSelect(...renders){
  for(const render of renders)pending.add(render);
 }
 // Sincronização periódica conservadora: não sobrescreve nem remove registros.
-// As demais áreas continuam locais até a criação das tabelas e políticas específicas.
+// O planejamento compartilha metas, fila, folgas e lançamentos por registro versionado.
 // Um único ciclo preserva a ordem dos vínculos e mantém todos os erros visíveis.
 setInterval(()=>{if(document.visibilityState==='visible')cloudSyncAll(true)},10000);
 let scheduledCloudSync;
@@ -714,7 +714,7 @@ let cloudLotsBusy=false;
 const cloudLotJson=x=>JSON.stringify(cloudCanonical(x));
 async function cloudUpdateLot(l,remoteRow){
  const url=SUPABASE_PROJECT_URL+'/rest/v1/production_lots?id=eq.'+encodeURIComponent(String(l.id))+'&updated_at=eq.'+encodeURIComponent(remoteRow.updated_at);
- const response=await fetch(url,{method:'PATCH',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({data:l,updated_at:new Date().toISOString(),updated_by:cloudSession.user_id}),cache:'no-store'});
+ const response=await cloudFetch(url,{method:'PATCH',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({data:l,updated_at:new Date().toISOString(),updated_by:cloudSession.user_id}),cache:'no-store'});
  if(!response.ok){let detail='';try{detail=(await response.json()).message||''}catch(e){}throw Error('Atualização do lote: HTTP '+response.status+' '+detail)}
  const rows=await response.json();
  if(rows.length!==1)throw Error('O lote foi alterado por outro usuário durante a sincronização. Atualize e tente novamente.');
@@ -739,7 +739,7 @@ async function resolveTestLotDeletions(){
   msg.textContent='Backup salvo. Removendo '+relatedCosts.length+' custo(s) de teste antes dos lotes...';
   async function deleteRow(table,key,row){
    const url=SUPABASE_PROJECT_URL+'/rest/v1/'+table+'?'+key+'=eq.'+encodeURIComponent(String(row[key]))+'&updated_at=eq.'+encodeURIComponent(row.updated_at);
-   const res=await fetch(url,{method:'DELETE',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,Prefer:'return=representation'},cache:'no-store'});
+   const res=await cloudFetch(url,{method:'DELETE',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,Prefer:'return=representation'},cache:'no-store'});
    if(!res.ok){let detail='';try{detail=(await res.json()).message||''}catch(e){}throw Error(table+' HTTP '+res.status+(detail?' — '+detail:''))}
    const deleted=await res.json();if(deleted.length!==1)throw Error('Exclusão não confirmada em '+table+' para '+row[key]);
   }
@@ -773,6 +773,7 @@ async function cloudSyncLots(automatic=false){
   if(!Array.isArray(remote))throw Error('Resposta inesperada da tabela production_lots');
   const remoteById=new Map(remote.map(x=>[String(x.id),x]));
   const localById=new Map(lots.map(l=>[String(l.id),l]));
+  const localSnapshot=new Map(lots.map(l=>[String(l.id),cloudLotJson(l)]));
   let baseline={};try{baseline=JSON.parse(localStorage.getItem(CLOUD_LOTS_BASE_KEY)||'{}')||{}}catch(e){}
   const nextBase={...baseline},newLocal=[],toDownload=[],toUpdate=[],conflicts=[],remoteDeletedTestLots=[];
   const report=(id,reason,local,remote)=>{const l=local||remote||{};const p=parents.find(p=>String(p.id)===String(l.parentId));conflicts.push({id,reason,brand:l.brand||'Sem marca',lot:p?.number||l.number||'Sem número',parentId:l.parentId||'',local:!!local,remote:!!remote});};
@@ -829,16 +830,18 @@ async function cloudSyncLots(automatic=false){
    renderAfterLotSelect(renderLots,renderSavedChildren,renderHistory,updatePieceAvailability);
   }
   if(conflicts.length){document.getElementById('resolve-test-lots').style.display=conflicts.length===3&&conflicts.every(c=>TEST_LOT_IDS.includes(c.id)&&!c.local&&c.remote)?'block':'none';msg.textContent='Atenção: '+conflicts.length+' lote(s) em conflito. Nenhum dado foi alterado.\n'+conflicts.map((c,i)=>(i+1)+'. '+c.lot+' / '+c.brand+' — '+c.reason+' (ID: '+c.id+')').join('\n');msg.style.whiteSpace='pre-line';return}
-  if(newLocal.length)await cloudMaterialsRequest('production_lots','POST',newLocal.map(l=>({id:String(l.id),data:l,updated_by:cloudSession.user_id})));
-  for(const l of newLocal)nextBase[String(l.id)]=cloudLotJson(l);
-  for(const item of toUpdate){await cloudUpdateLot(item.l,item.row);nextBase[String(item.l.id)]=cloudLotJson(item.l)}
+  const sentLots=new Map(newLocal.map(l=>[String(l.id),cloudLotJson(l)]));
+  if(newLocal.length)await cloudMaterialsRequest('production_lots','POST',newLocal.map(l=>({id:String(l.id),data:JSON.parse(sentLots.get(String(l.id))),updated_by:cloudSession.user_id})));
+  for(const [id,sent] of sentLots)nextBase[id]=sent;
+  for(const item of toUpdate){const sent=cloudLotJson(item.l);await cloudUpdateLot(JSON.parse(sent),item.row);nextBase[String(item.l.id)]=sent}
   if(toDownload.length){
-   const downloads=new Map(toDownload.map(l=>[String(l.id),l]));
+   const accepted=toDownload.filter(l=>cloudLotJson(lots.find(current=>String(current.id)===String(l.id)))===localSnapshot.get(String(l.id)));
+   const downloads=new Map(accepted.map(l=>[String(l.id),l]));
    lots=lots.map(l=>downloads.get(String(l.id))||l);
    for(const [id,l] of downloads)if(!localById.has(id))lots.push(l);
    localStorage.setItem(LOT_KEY,JSON.stringify(lots));
    renderAfterLotSelect(renderLots,renderSavedChildren,renderHistory,updatePieceAvailability);
-   for(const l of toDownload)nextBase[String(l.id)]=cloudLotJson(l);
+   for(const l of accepted)nextBase[String(l.id)]=cloudLotJson(l);
   }
   localStorage.setItem(CLOUD_LOTS_BASE_KEY,JSON.stringify(nextBase));
   if(newLocal.length||toUpdate.length||toDownload.length){
@@ -860,6 +863,7 @@ async function cloudSyncCuts(automatic=false){
   if(!Array.isArray(remote))throw Error('Resposta inesperada da tabela fabric_cuts.');
   const byRemote=new Map(remote.map(r=>[String(r.id),r]));
   const byLocal=new Map(cuts.map(c=>[String(c.id),c]));
+  const cutSnapshot=new Map(cuts.map(c=>[String(c.id),cloudLotJson(c)]));
   let baseline={};try{baseline=JSON.parse(localStorage.getItem(CLOUD_CUTS_BASE_KEY)||'{}')||{}}catch(e){}
   const next={...baseline},newCuts=[],updates=[],downloads=[],conflicts=[],remoteDeleted=[];
   const knownPurchaseIds=new Set(parents.map(p=>String(p.id)));
@@ -900,26 +904,30 @@ async function cloudSyncCuts(automatic=false){
   const purchaseIds=new Set(purchases.map(p=>String(p.id)));
   const missing=newCuts.filter(c=>!purchaseIds.has(String(c.parentId)));
   if(missing.length)throw Error(missing.length+' corte(s) vinculados a compras ainda não disponíveis na nuvem.');
+  const sentCuts=new Map(newCuts.map(c=>[String(c.id),cloudLotJson(c)]));
   if(newCuts.length)await cloudMaterialsRequest('fabric_cuts','POST',newCuts.map(c=>({
-   id:String(c.id),purchase_id:String(c.parentId),data:c,updated_by:cloudSession.user_id
+   id:String(c.id),purchase_id:String(c.parentId),data:JSON.parse(sentCuts.get(String(c.id))),updated_by:cloudSession.user_id
   })));
-  for(const c of newCuts)next[String(c.id)]=cloudLotJson(c);
+  for(const [id,sent] of sentCuts)next[id]=sent;
   for(const {c,row} of updates){
+   const sent=cloudLotJson(c);
    const url=SUPABASE_PROJECT_URL+'/rest/v1/fabric_cuts?id=eq.'+encodeURIComponent(String(c.id))+
     '&updated_at=eq.'+encodeURIComponent(row.updated_at);
-   const response=await fetch(url,{method:'PATCH',headers:{
+   const response=await cloudFetch(url,{method:'PATCH',headers:{
     apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,
     'Content-Type':'application/json',Prefer:'return=representation'
-   },body:JSON.stringify({data:c,updated_at:new Date().toISOString(),updated_by:cloudSession.user_id}),cache:'no-store'});
+   },body:JSON.stringify({data:JSON.parse(sent),updated_at:new Date().toISOString(),updated_by:cloudSession.user_id}),cache:'no-store'});
    if(!response.ok)throw Error('Atualização do corte '+c.id+': HTTP '+response.status);
    const saved=await response.json();
    if(saved.length!==1)throw Error('Outro computador alterou o corte '+c.id+'. Nenhum dado local foi apagado.');
-   next[String(c.id)]=cloudLotJson(c);
+   next[String(c.id)]=sent;
   }
   if(downloads.length||remoteDeleted.length){
-   const incoming=new Map(downloads.map(c=>[String(c.id),c]));
-   const deletedIds=new Set(remoteDeleted.map(c=>String(c.id)));
-   for(const c of remoteDeleted){
+   const unchanged=c=>cloudLotJson(cuts.find(current=>String(current.id)===String(c.id)))===cutSnapshot.get(String(c.id));
+   const accepted=downloads.filter(unchanged),acceptedDeleted=remoteDeleted.filter(unchanged);
+   const incoming=new Map(accepted.map(c=>[String(c.id),c]));
+   const deletedIds=new Set(acceptedDeleted.map(c=>String(c.id)));
+   for(const c of acceptedDeleted){
     localStorage.setItem('lobo-backup-corte-excluido-nuvem-'+c.id+'-'+Date.now(),JSON.stringify(c));
     delete next[String(c.id)];
    }
@@ -930,7 +938,7 @@ async function cloudSyncCuts(automatic=false){
    if(merged.some(c=>!known.has(String(c.parentId))))throw Error('Existe corte remoto cuja compra não foi carregada neste computador.');
    localStorage.setItem(CUT_KEY,JSON.stringify(merged));
    cuts=merged;renderAfterLotSelect(renderCut,renderSavedChildren,updateParentChoices);
-   for(const c of downloads)next[String(c.id)]=cloudLotJson(c);
+   for(const c of accepted)next[String(c.id)]=cloudLotJson(c);
   }
   localStorage.setItem(CLOUD_CUTS_BASE_KEY,JSON.stringify(next));
   if(!automatic||newCuts.length||updates.length||downloads.length||remoteDeleted.length)
@@ -976,7 +984,7 @@ async function cloudSyncAll(automatic=false){
   msg.textContent=results.join(' | ');
  }catch(err){
   console.error('Falha de sincronização',err);const location=(err?.stack||'').split('\n').slice(0,4).join(' | ');msg.textContent=results.join(' | ')+' | Falha inesperada: '+(err.message||err)+'. Etapa: '+(results.length+1)+'. Detalhe técnico: '+location+'. Dados locais preservados.';
- }finally{delete btn.dataset.syncing;cloudSyncCycleRunning=false;btn.disabled=false;cloudSyncHasError=cloudSyncFailurePattern.test(msg.textContent);if(!cloudSyncHasError)document.getElementById('cloud-conflict-details').style.display='none';refreshCloudSyncAlert();refreshSewingPlan();}
+ }finally{const previousMessage=msg.textContent;try{await cloudSyncPlanning();msg.textContent=previousMessage+' | '+msg.textContent}catch(error){msg.textContent=previousMessage+' | Planejamento não sincronizado: '+error.message}delete btn.dataset.syncing;cloudSyncCycleRunning=false;btn.disabled=false;cloudSyncHasError=cloudSyncFailurePattern.test(msg.textContent);if(!cloudSyncHasError)document.getElementById('cloud-conflict-details').style.display='none';refreshCloudSyncAlert();refreshSewingPlan();}
 }
 // Custos individuais: sincronização conservadora por lot_id (chave da tabela lot_costs).
 const CLOUD_COST_BASE='lobo-industrial-custos-base-v1';
@@ -1029,15 +1037,17 @@ async function cloudSyncCosts(automatic=false){
   const validIds=new Set(cloudLots.map(row=>String(row.id)));
   if(newCosts.some(x=>!validIds.has(x.id)))throw Error('O lote '+newCosts.filter(x=>!validIds.has(x.id)).map(x=>x.id).join(', ')+' possui custo salvo neste navegador, mas ainda não existe em production_lots no Supabase. Sincronize os lotes primeiro; nenhum custo foi apagado.');
   if(downloads.some(x=>!lots.some(l=>String(l.id)===x.id)))throw Error('O lote de um custo remoto ainda não está disponível neste computador.');
-  if(newCosts.length)await cloudMaterialsRequest('lot_costs','POST',newCosts.map(x=>({lot_id:x.id,data:x.data,updated_by:cloudSession.user_id})));
-  for(const x of newCosts)next[x.id]=cloudLotJson(x.data);
+  const sentCosts=new Map(newCosts.map(x=>[x.id,cloudLotJson(x.data)]));
+  if(newCosts.length)await cloudMaterialsRequest('lot_costs','POST',newCosts.map(x=>({lot_id:x.id,data:JSON.parse(sentCosts.get(x.id)),updated_by:cloudSession.user_id})));
+  for(const [id,sent] of sentCosts)next[id]=sent;
   for(const x of updates){
+   const sent=cloudLotJson(x.data);
    const url=SUPABASE_PROJECT_URL+'/rest/v1/lot_costs?lot_id=eq.'+encodeURIComponent(x.id)+'&updated_at=eq.'+encodeURIComponent(x.row.updated_at);
-   const response=await fetch(url,{method:'PATCH',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({data:x.data,updated_at:new Date().toISOString(),updated_by:cloudSession.user_id}),cache:'no-store'});
+   const response=await cloudFetch(url,{method:'PATCH',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({data:JSON.parse(sent),updated_at:new Date().toISOString(),updated_by:cloudSession.user_id}),cache:'no-store'});
    if(!response.ok){let detail='';try{detail=(await response.json()).message||''}catch(e){}throw Error('Atualização de custo: HTTP '+response.status+' '+detail)}
    const result=await response.json();
    if(result.length!==1)throw Error('Outro computador alterou o custo '+x.id+'. Nenhum dado local foi apagado.');
-   next[x.id]=cloudLotJson(x.data);
+   next[x.id]=sent;
   }
   const deferred=downloads.filter(x=>cloudLotJson(costData[x.id])!==x.local||
    ($('page-custos').style.display==='block'&&(costDraftDirty||extraActive)&&x.id===selectedCostLotId()));
@@ -1208,6 +1218,238 @@ $('cut-list').onclick=async e=>{const b=e.target.closest('button');if(!b)return;
 const PLAN_KEY='lobo-planejamento-costura-v1';
 const PLAN_MAX_PIECES=100000000;
 let sewingDetailView=null;
+let cloudRecoverySession=null;
+async function cloudFetch(url,options={}){
+ const controller=typeof AbortController==='function'?new AbortController():null;
+ const timeout=controller?setTimeout(()=>controller.abort(),20000):null;
+ try{return await fetch(url,{...options,...(controller?{signal:controller.signal}:{})})}
+ catch(error){throw Error(error.name==='AbortError'?'O servidor demorou para responder. Tente novamente.':'Não foi possível conectar ao servidor. Verifique a conexão e tente novamente.')}
+ finally{if(timeout)clearTimeout(timeout)}
+}
+function authErrorMessage(response,data){
+ const code=data.error_code||data.code||'';
+ if(code==='email_not_confirmed')return 'Confirme seu e-mail antes de entrar. Verifique a mensagem de confirmação na caixa de entrada e no spam.';
+ if(code==='invalid_credentials'||response.status===400&&/invalid login credentials/i.test(data.msg||data.error_description||''))return 'E-mail ou senha incorretos. Confira os dados ou clique em “Recuperar senha”.';
+ if(response.status===429)return 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.';
+ if(code==='user_banned')return 'Esta conta está bloqueada. Solicite a liberação ao responsável pelo sistema.';
+ return data.msg||data.error_description||data.message||'Não foi possível entrar. Tente novamente.';
+}
+$('cloud-password-toggle').onclick=()=>{
+ const input=$('cloud-password'),show=input.type==='password';
+ input.type=show?'text':'password';
+ $('cloud-password-toggle').setAttribute('aria-label',show?'Ocultar senha':'Mostrar senha');
+};
+$('cloud-recover').onclick=async()=>{
+ const email=$('cloud-email').value.trim(),message=$('cloud-login-message'),button=$('cloud-recover');
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){message.textContent='Informe seu e-mail acima para recuperar a senha.';$('cloud-email').focus();return}
+ button.disabled=true;
+ message.textContent='Solicitando recuperação de senha…';
+ try{
+  const url=new URL(location.href),redirect=url.origin+url.pathname;
+  const response=await cloudFetch(SUPABASE_PROJECT_URL+'/auth/v1/recover?redirect_to='+encodeURIComponent(redirect),{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({email}),cache:'no-store'});
+  const data=await response.json();
+  if(!response.ok)throw Error(authErrorMessage(response,data));
+  message.textContent='Se houver uma conta com esse e-mail, você receberá um link para criar uma nova senha. Confira também o spam.';
+ }catch(error){message.textContent=error.message||'Não foi possível solicitar a recuperação.'}
+ finally{button.disabled=false}
+};
+async function handleCloudRecovery(){
+ const url=new URL(location.href),params=new URLSearchParams(url.hash.slice(1));
+ if(params.get('error')){
+  history.replaceState(null,'',url.pathname+url.search);
+  $('cloud-login-message').textContent='O link de acesso expirou ou já foi usado. Solicite outro em “Recuperar senha”.';
+  return;
+ }
+ if(params.get('type')!=='recovery'||!params.get('access_token'))return;
+ const accessToken=params.get('access_token');
+ history.replaceState(null,'',url.pathname+url.search);
+ $('cloud-login-message').textContent='Verificando o link de recuperação…';
+ try{
+  const response=await cloudFetch(SUPABASE_PROJECT_URL+'/auth/v1/user',{headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+accessToken},cache:'no-store'});
+  if(!response.ok)throw Error('O link expirou ou já foi usado. Solicite outro em “Recuperar senha”.');
+  const user=await response.json();
+  if(!user.id)throw Error('Link de recuperação inválido.');
+  cloudRecoverySession={access_token:accessToken};
+  $('cloud-email').value=user.email||'';
+  $('cloud-login-form').hidden=true;
+  $('cloud-reset-form').hidden=false;
+  $('cloud-new-password').focus();
+ }catch(error){$('cloud-login-message').textContent=error.message}
+}
+$('cloud-reset-form').onsubmit=async event=>{
+ event.preventDefault();
+ const password=$('cloud-new-password').value,confirmPassword=$('cloud-confirm-password').value,message=$('cloud-reset-message'),button=$('cloud-reset-save');
+ if(password.length<8||password!==confirmPassword){message.textContent='Digite a mesma senha nos dois campos, com pelo menos 8 caracteres.';return}
+ if(!cloudRecoverySession){message.textContent='Solicite um novo link de recuperação.';return}
+ button.disabled=true;
+ try{
+  const response=await cloudFetch(SUPABASE_PROJECT_URL+'/auth/v1/user',{method:'PUT',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudRecoverySession.access_token,'Content-Type':'application/json'},body:JSON.stringify({password}),cache:'no-store'});
+  const data=await response.json();
+  if(!response.ok)throw Error(authErrorMessage(response,data));
+  cloudRecoverySession=null;
+  $('cloud-new-password').value='';$('cloud-confirm-password').value='';$('cloud-password').value='';
+  $('cloud-reset-form').hidden=true;$('cloud-login-form').hidden=false;
+  $('cloud-login-message').textContent='Senha atualizada. Entre com a nova senha.';
+  $('cloud-password').focus();
+ }catch(error){message.textContent=error.message}
+ finally{button.disabled=false}
+};
+
+let cloudPlanningBusy=false;
+let planningConflicts=new Map();
+const emptyPlanningValue=()=>({value:null});
+function planningBaseKey(){return planStorageKey()+':cloud-base-v1'}
+function planningRecords(){
+ const result={};
+ for(const [key,plan] of Object.entries(loadPlans())){
+  if(!/^month:\d{4}-\d{2}-01$/.test(key))continue;
+  const month=key.slice(6);
+  if(plan.daily!==undefined)result['goal:'+month]={value:plan.daily};
+  if(Array.isArray(plan.queue))result['queue:'+month]={value:plan.queue};
+  for(const [id,value] of Object.entries(plan.estimates||{}))result['estimate:'+month+':'+id]={value};
+ }
+ for(const [date,value] of Object.entries(loadWorkCalendar()))if(validPlanDate(date)&&typeof value==='boolean')result['calendar:'+date]={value};
+ for(const [date,value] of Object.entries(loadDailySewing()))if(validPlanDate(date)&&Number.isSafeInteger(value)&&value>=0)result['output:'+date]={value};
+ return result;
+}
+function validPlanningRecord(id,data){
+ if(!data||typeof data!=='object'||!Object.hasOwn(data,'value'))return false;
+ const [kind,date,...rest]=id.split(':'),value=data.value;
+ if(!validPlanDate(date))return false;
+ if(['goal','queue','estimate'].includes(kind)&&!date.endsWith('-01'))return false;
+ if(kind==='estimate'&&!rest.join(':'))return false;
+ if(kind!=='estimate'&&rest.length)return false;
+ if(!['goal','queue','estimate','calendar','output'].includes(kind))return false;
+ if(value===null)return true;
+ if(kind==='calendar')return typeof value==='boolean';
+ if(kind==='queue')return Array.isArray(value)&&value.every(id=>typeof id==='string');
+ if(kind==='estimate')return value&&typeof value==='object'&&!Array.isArray(value)&&Number.isSafeInteger(value.pieces)&&value.pieces>=0;
+ return Number.isSafeInteger(value)&&value>=0&&value<=PLAN_MAX_PIECES;
+}
+function applyPlanningRecord(id,data){
+ if(!validPlanningRecord(id,data))throw Error('Registro de planejamento inválido.');
+ const [kind,date,...rest]=id.split(':'),value=data.value;
+ if(kind==='calendar'||kind==='output'){
+  const all=kind==='calendar'?loadWorkCalendar():loadDailySewing();
+  if(value===null)delete all[date];else all[date]=value;
+  localStorage.setItem(kind==='calendar'?planStorageKey()+':calendario':dailySewingKey(),JSON.stringify(all));
+ }else{
+  const all=loadPlans(),key='month:'+date,plan={...all[key]};
+  if(kind==='estimate'){
+   plan.estimates={...plan.estimates};
+   if(value===null)delete plan.estimates[rest.join(':')];else plan.estimates[rest.join(':')]=value;
+  }else{
+   const field=kind==='goal'?'daily':'queue';
+   if(value===null)delete plan[field];else plan[field]=value;
+  }
+  localStorage.setItem(planStorageKey(),JSON.stringify({...all,[key]:plan}));
+ }
+}
+function planningChanged(){
+ $('plan-cloud-status').textContent=cloudSession?'Alteração salva neste computador. Aguardando confirmação da nuvem…':'Alteração salva neste computador. Entre na conta para sincronizar.';
+ scheduleCloudSync();
+}
+function planningRecordLabel(id){
+ const [kind,date]=id.split(':');
+ return ({goal:'Meta diária',queue:'Fila de costura',estimate:'Simulação',calendar:'Dia de produção/folga',output:'Produção realizada'}[kind]||'Planejamento')+' · '+fmtDate(date);
+}
+function planningValueLabel(id,data){
+ const kind=id.split(':')[0],value=data?.value;
+ if(value===null||value===undefined)return 'Sem definição';
+ if(kind==='calendar')return value?'Dia de produção':'Folga';
+ if(kind==='queue')return value.length?value.map(id=>parents.find(p=>p.id===id)?.number||'Lote não encontrado').join(' → '):'Fila vazia';
+ if(kind==='estimate')return num(value.pieces)+' peças simuladas';
+ return num(value)+' peças';
+}
+function renderPlanningConflicts(){
+ $('plan-cloud-conflicts').hidden=!planningConflicts.size;
+ $('plan-cloud-conflict-list').innerHTML=[...planningConflicts].map(([id,conflict])=>`<div class="plan-output-entry"><span><strong>${esc(planningRecordLabel(id))}</strong><br><small>Neste computador: ${esc(planningValueLabel(id,conflict.local))} · Nuvem: ${esc(planningValueLabel(id,conflict.remote?.data))}</small></span><div><button type="button" class="btn secondary" data-planning-choice="remote" data-planning-record="${esc(id)}">Usar alteração da nuvem</button><button type="button" class="btn secondary" data-planning-choice="local" data-planning-record="${esc(id)}">Manter minha alteração</button></div></div>`).join('');
+}
+async function planningWrite(id,data,row){
+ await ensureCloudSession();
+ const query=row?'?id=eq.'+encodeURIComponent(id)+'&revision=eq.'+encodeURIComponent(row.revision):'';
+ const response=await cloudFetch(SUPABASE_PROJECT_URL+'/rest/v1/sewing_planning'+query,{
+  method:row?'PATCH':'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+cloudSession.access_token,'Content-Type':'application/json',Prefer:'return=representation'},
+  body:JSON.stringify(row?{data,updated_by:cloudSession.user_id}:{id,data,updated_by:cloudSession.user_id}),cache:'no-store'
+ });
+ if(!response.ok)throw Error('Planejamento: HTTP '+response.status+'. Alteração local preservada.');
+ const saved=await response.json();
+ if(!Array.isArray(saved)||saved.length!==1||saved[0].id!==id||!cloudEqual(saved[0].data,data))throw Error('Alteração simultânea no planejamento. Tente sincronizar novamente.');
+ return saved[0];
+}
+async function cloudSyncPlanning(){
+ if(!cloudSession||cloudPlanningBusy)return;
+ cloudPlanningBusy=true;
+ const msg=$('cloud-sync-message'),namespace=planStorageKey();
+ let baseline={};
+ try{
+  baseline=JSON.parse(localStorage.getItem(planningBaseKey())||'{}')||{};
+  const rows=await cloudMaterialsRequest('sewing_planning','GET');
+  if(namespace!==planStorageKey())throw Error('A conta foi alterada durante a sincronização.');
+  const remote=new Map();
+  for(const row of rows){
+   if(!validPlanningRecord(String(row.id),row.data)||!Number.isSafeInteger(Number(row.revision))||Number(row.revision)<1)throw Error('Resposta inválida do planejamento. Dados locais preservados.');
+   remote.set(String(row.id),row);
+  }
+  const before=planningRecords(),ids=new Set([...Object.keys(before),...Object.keys(baseline),...remote.keys()]);
+  const conflicts=new Map();
+  for(const id of ids){
+   if(namespace!==planStorageKey())throw Error('A conta foi alterada durante a sincronização.');
+   const local=before[id]||emptyPlanningValue(),row=remote.get(id),server=row?.data||emptyPlanningValue(),base=baseline[id]?.data||emptyPlanningValue();
+   const changedLocal=!cloudEqual(local,base),changedRemote=!cloudEqual(server,base);
+   if(changedLocal&&changedRemote&&!cloudEqual(local,server)){
+    conflicts.set(id,{local,remote:row||null});
+    continue;
+   }
+   if(changedLocal&&!cloudEqual(local,server)){
+    baseline[id]=await planningWrite(id,local,row);
+   }else{
+    if(!cloudEqual(local,server)&&cloudEqual(planningRecords()[id]||emptyPlanningValue(),local)){
+     localStorage.setItem(namespace+':backup:'+id,JSON.stringify({data:local,at:new Date().toISOString()}));
+     applyPlanningRecord(id,server);
+    }
+    if(row)baseline[id]=row;else delete baseline[id];
+   }
+  }
+  planningConflicts=conflicts;
+  renderPlanningConflicts();
+  if(conflicts.size)throw Error('Conflito em '+conflicts.size+' alteração(ões) do planejamento. Abra “Conferir alterações” e escolha qual manter.');
+  const current=planningRecords(),pending=new Set([...Object.keys(current),...Object.keys(baseline)]);
+  const dirty=[...pending].some(id=>!cloudEqual(current[id]||emptyPlanningValue(),baseline[id]?.data||emptyPlanningValue()));
+  $('plan-cloud-status').textContent=dirty?'Alteração local pendente de envio. Sincronizando…':'Planejamento salvo na nuvem. Disponível nos outros computadores.';
+  msg.textContent=dirty?'Planejamento: envio pendente; dados locais preservados.':'Planejamento salvo na nuvem.';
+  if(dirty)scheduleCloudSync();
+ }catch(error){
+  msg.textContent='Planejamento não sincronizado: '+(error.message||error);
+  $('plan-cloud-status').textContent=msg.textContent+' As alterações deste computador foram preservadas.';
+ }finally{
+  if(namespace===planStorageKey()){
+   try{localStorage.setItem(planningBaseKey(),JSON.stringify(baseline))}catch(error){msg.textContent='Falha ao registrar a confirmação do planejamento. Dados preservados.'}
+  }
+  cloudPlanningBusy=false;
+ }
+}
+$('plan-cloud-conflict-list').onclick=async event=>{
+ const button=event.target.closest('[data-planning-choice]');
+ if(!button||cloudPlanningBusy||cloudSyncCycleRunning)return;
+ const id=button.dataset.planningRecord,conflict=planningConflicts.get(id);
+ if(!conflict)return;
+ button.disabled=true;
+ try{
+  const before=planningRecords()[id]||emptyPlanningValue();
+  const row=(await cloudMaterialsRequest('sewing_planning','GET')).find(row=>row.id===id);
+  if(!cloudEqual(planningRecords()[id]||emptyPlanningValue(),before))throw Error('A alteração foi editada durante a conferência. Confira novamente.');
+  localStorage.setItem(planStorageKey()+':backup:'+id,JSON.stringify({data:before,remote:row?.data,at:new Date().toISOString()}));
+  if(button.dataset.planningChoice==='remote')applyPlanningRecord(id,row?.data||emptyPlanningValue());
+  const baseline=JSON.parse(localStorage.getItem(planningBaseKey())||'{}')||{};
+  if(row)baseline[id]=row;else delete baseline[id];
+  localStorage.setItem(planningBaseKey(),JSON.stringify(baseline));
+  planningConflicts.delete(id);renderPlanningConflicts();
+  await cloudSyncAll(true);
+ }catch(error){$('plan-cloud-status').textContent=error.message||String(error)}
+ finally{button.disabled=false}
+};
+
 
 function planInteger(value,max=Number.MAX_SAFE_INTEGER){
  const n=Number(value);
@@ -1324,7 +1566,7 @@ function saveWorkCalendar(day,working){
  else overrides[day.date]=working;
  try{localStorage.setItem(planStorageKey()+':calendario',JSON.stringify(overrides))}
  catch(error){$('plan-calendar-message').textContent='Não foi possível salvar o calendário.';return}
- $('plan-calendar-message').textContent='Calendário atualizado.';
+ planningChanged();$('plan-calendar-message').textContent='Calendário atualizado.';
  renderSewingPlan();
 }
 $('plan-calendar-form').onsubmit=event=>{
@@ -1367,7 +1609,7 @@ function savePlan(period,plan,message,saveGoal=false){
   const saved={...plans[period.key],queue:plan.queue,estimates:plan.estimates,
    daily:saveGoal?plan.daily:plans[period.key]?.daily};
   localStorage.setItem(planStorageKey(),JSON.stringify({...plans,[period.key]:saved}));
-  $('plan-message').textContent=message;
+  planningChanged();$('plan-message').textContent=message;
   return true;
  }catch(error){
   $('plan-message').textContent='Não foi possível salvar neste navegador.';
@@ -1510,7 +1752,7 @@ function loadDailySewing(){
 function saveDailySewing(entries){
  try{
   localStorage.setItem(dailySewingKey(),JSON.stringify(entries));
-  return true;
+  planningChanged();return true;
  }catch(error){
   $('plan-output-message').textContent='Não foi possível salvar a produção neste navegador.';
   return false;
@@ -2313,6 +2555,7 @@ $('ind-brand').onchange=renderIndicators;$('ind-from').onchange=renderIndicators
 
 clearCut();
 receiptChoices();resetParent();resetChild(true);renderLots();$('page-materia').style.display='block';$('page-lotes').style.display='none';$('lot-sidebar').style.display='none';
+handleCloudRecovery();
 </script></body></html>
 
 

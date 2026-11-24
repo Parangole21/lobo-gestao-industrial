@@ -10,12 +10,12 @@ function harness() {
  const nodes = new Map(), storage = new Map(), alerts = [], requests=[];
  class Node {
   constructor(id){this.id=id;this.value='';this.textContent='';this.innerHTML='';this.style={};this.dataset={};this.disabled=false;this.checked=false;this.children=new Map();this.classes=new Set();this.classList={add:(x)=>this.classes.add(x),remove:(x)=>this.classes.delete(x),toggle:(x,b)=>b===undefined?(this.classes.has(x)?this.classes.delete(x):this.classes.add(x)):(b?this.classes.add(x):this.classes.delete(x))};}
-  addEventListener(){} setAttribute(){} scrollIntoView(){} focus(){} reset(){} click(){} replaceChildren(){}
+  addEventListener(type,fn){this.handlers??={};this.handlers[type]=fn;} setAttribute(name,value){this[name]=value;} scrollIntoView(){} focus(){} reset(){} click(){} replaceChildren(){}
   querySelector(selector){if(!this.children.has(selector))this.children.set(selector,new Node(selector));return this.children.get(selector);}
   querySelectorAll(){return [];} closest(){return null;}
  }
  const el = id => {if(!nodes.has(id))nodes.set(id,new Node(id));return nodes.get(id);};
- const context = {console,Intl,Date,Number,JSON,Map,Set,URL,Blob,Math,Promise,
+ const context = {console,Intl,Date,Number,JSON,Map,Set,URL,URLSearchParams,Blob,Math,Promise,
   crypto:{randomUUID:()=>`id-${++context.seq}`},seq:0,
   document:{getElementById:el,querySelector:el,querySelectorAll:()=>[],body:new Node('body'),addEventListener(){},visibilityState:'visible',createElement:()=>new Node('created')},
   window:{addEventListener(){},scrollTo(){}},history:{state:null,replaceState(){},pushState(){}},location:{href:'https://example.test/'},
@@ -1138,4 +1138,299 @@ test('a simulation edited during purchase synchronization remains pending for th
  await h.run('cloudSyncMaterials(true)');
  assert.deepEqual(sent,[350,400]);
  assert.equal(h.run("JSON.parse(readMaterialsBaseline().purchases.p).simulatedPieces"),400);
+});
+function sharedPlanningServer(...clients){
+ const rows=new Map(),calls=[];
+ const server={rows,calls,beforeWrite:null};
+ for(const h of clients){
+  h.run("cloudSession={access_token:'test-token',user_id:'user-"+clients.indexOf(h)+"'}");
+  h.context.fetch=async(url,options={})=>{
+   calls.push({url,options});
+   if(!url.includes('/sewing_planning'))return {ok:true,status:200,json:async()=>[]};
+   const u=new URL(url),method=options.method||'GET';
+   if(method==='GET')return {ok:true,status:200,json:async()=>structuredClone([...rows.values()])};
+   const body=JSON.parse(options.body),id=body.id||u.searchParams.get('id').slice(3);
+   if(server.beforeWrite)await server.beforeWrite({h,id,body,method});
+   const row=rows.get(id);
+   if(method==='POST'&&row)return {ok:false,status:409,json:async()=>({message:'duplicate key'})};
+   if(method==='PATCH'&&(!row||String(row.revision)!==u.searchParams.get('revision')?.slice(3)))return {ok:true,status:200,json:async()=>[]};
+   const next={...body,id,revision:(row?.revision||0)+1,updated_at:'version-'+((row?.revision||0)+1)};
+   rows.set(id,structuredClone(next));
+   return {ok:true,status:method==='POST'?201:200,json:async()=>structuredClone([next])};
+  };
+ }
+ return server;
+}
+function storePlanning(h,{plans={},calendar={},outputs={}}={}){
+ h.context.planningSeed={plans,calendar,outputs};
+ h.run(`localStorage.setItem(planStorageKey(),JSON.stringify(planningSeed.plans));
+  localStorage.setItem(planStorageKey()+':calendario',JSON.stringify(planningSeed.calendar));
+  localStorage.setItem(dailySewingKey(),JSON.stringify(planningSeed.outputs));`);
+}
+
+test('goals, queue, estimates, days off and output survive a reload and reach a different PC and user',async()=>{
+ const a=harness(),b=harness(),server=sharedPlanningServer(a,b);
+ storePlanning(a,{plans:{'month:2026-11-01':{daily:400,queue:['lot-a','lot-b'],estimates:{'lot-a':{pieces:500,cutAtEntry:100}}}},calendar:{'2026-12-24':false,'2026-12-26':true},outputs:{'2026-11-24':450}});
+ await a.run('cloudSyncPlanning()');
+ assert.equal(server.rows.size,6);
+ assert.match(a.el('plan-cloud-status').textContent,/salvo na nuvem/);
+ await b.run('cloudSyncPlanning()');
+ assert.equal(b.run("loadPlans()['month:2026-11-01'].daily"),400);
+ assert.deepEqual(JSON.parse(b.run("JSON.stringify(loadPlans()['month:2026-11-01'].queue)")),['lot-a','lot-b']);
+ assert.equal(b.run("loadPlans()['month:2026-11-01'].estimates['lot-a'].pieces"),500);
+ assert.equal(b.run("loadWorkCalendar()['2026-12-24']"),false);
+ assert.equal(b.run("loadWorkCalendar()['2026-12-26']"),true);
+ assert.equal(b.run("loadDailySewing()['2026-11-24']"),450);
+ const reloaded=harness();
+ reloaded.run("cloudSession={access_token:'test-token',user_id:'user-1'}");
+ for(const [key,value] of b.storage)reloaded.storage.set(key,value);
+ assert.equal(reloaded.run("loadPlans()['month:2026-11-01'].daily"),400);
+ assert.equal(reloaded.run("loadWorkCalendar()['2026-12-24']"),false);
+});
+
+test('different PCs can edit a goal and a day off independently without overwriting each other',async()=>{
+ const a=harness(),b=harness();sharedPlanningServer(a,b);
+ storePlanning(a,{plans:{'month:2026-11-01':{daily:400}}});
+ await a.run('cloudSyncPlanning()');await b.run('cloudSyncPlanning()');
+ a.run("applyPlanningRecord('goal:2026-11-01',{value:420})");
+ b.run("applyPlanningRecord('calendar:2026-12-24',{value:false})");
+ await a.run('cloudSyncPlanning()');await b.run('cloudSyncPlanning()');await a.run('cloudSyncPlanning()');
+ for(const h of [a,b]){
+  assert.equal(h.run("loadPlans()['month:2026-11-01'].daily"),420);
+  assert.equal(h.run("loadWorkCalendar()['2026-12-24']"),false);
+ }
+});
+
+test('simultaneous edits to the same goal preserve both values and allow choosing the cloud revision',async()=>{
+ const a=harness(),b=harness(),server=sharedPlanningServer(a,b);
+ storePlanning(a,{plans:{'month:2026-11-01':{daily:400}}});
+ await a.run('cloudSyncPlanning()');await b.run('cloudSyncPlanning()');
+ a.run("applyPlanningRecord('goal:2026-11-01',{value:420})");
+ b.run("applyPlanningRecord('goal:2026-11-01',{value:450})");
+ await b.run('cloudSyncPlanning()');await a.run('cloudSyncPlanning()');
+ assert.equal(a.run("loadPlans()['month:2026-11-01'].daily"),420);
+ assert.equal(server.rows.get('goal:2026-11-01').data.value,450);
+ assert.match(a.el('plan-cloud-status').textContent,/Conflito/);
+ assert.match(a.el('plan-cloud-conflict-list').innerHTML,/Neste computador: 420 peças · Nuvem: 450 peças/);
+ assert.equal(a.el('plan-cloud-conflicts').hidden,false);
+ await a.el('plan-cloud-conflict-list').onclick({target:{closest:()=>({dataset:{planningChoice:'remote',planningRecord:'goal:2026-11-01'}})}});
+ assert.equal(a.run("loadPlans()['month:2026-11-01'].daily"),450);
+ const backup=[...a.storage].find(([key])=>key.includes(':backup:goal:2026-11-01'));
+ assert.equal(JSON.parse(backup[1]).data.value,420);
+});
+
+test('keeping a conflicting local goal uses a conditional update against the latest cloud revision',async()=>{
+ const a=harness(),b=harness(),server=sharedPlanningServer(a,b);
+ storePlanning(a,{plans:{'month:2026-11-01':{daily:400}}});
+ await a.run('cloudSyncPlanning()');await b.run('cloudSyncPlanning()');
+ a.run("applyPlanningRecord('goal:2026-11-01',{value:420})");
+ b.run("applyPlanningRecord('goal:2026-11-01',{value:450})");
+ await b.run('cloudSyncPlanning()');await a.run('cloudSyncPlanning()');
+ await a.el('plan-cloud-conflict-list').onclick({target:{closest:()=>({dataset:{planningChoice:'local',planningRecord:'goal:2026-11-01'}})}});
+ assert.equal(server.rows.get('goal:2026-11-01').data.value,420);
+ const patch=server.calls.filter(call=>call.options.method==='PATCH').at(-1);
+ assert.equal(new URL(patch.url).searchParams.get('revision'),'eq.2');
+});
+
+test('a local edit made while an older goal is being sent remains pending and is sent on the next sync',async()=>{
+ const h=harness(),server=sharedPlanningServer(h);
+ storePlanning(h,{plans:{'month:2026-11-01':{daily:400}}});await h.run('cloudSyncPlanning()');
+ h.run("applyPlanningRecord('goal:2026-11-01',{value:420})");
+ server.beforeWrite=()=>{server.beforeWrite=null;h.run("applyPlanningRecord('goal:2026-11-01',{value:440})")};
+ await h.run('cloudSyncPlanning()');
+ assert.equal(server.rows.get('goal:2026-11-01').data.value,420);
+ assert.equal(h.run("loadPlans()['month:2026-11-01'].daily"),440);
+ assert.match(h.el('plan-cloud-status').textContent,/pendente/);
+ await h.run('cloudSyncPlanning()');
+ assert.equal(server.rows.get('goal:2026-11-01').data.value,440);
+});
+
+test('an intervening remote write is rejected by revision checks and local data remains intact',async()=>{
+ const h=harness(),server=sharedPlanningServer(h);
+ storePlanning(h,{plans:{'month:2026-11-01':{daily:400}}});await h.run('cloudSyncPlanning()');
+ h.run("applyPlanningRecord('goal:2026-11-01',{value:420})");
+ server.beforeWrite=()=>{server.beforeWrite=null;server.rows.set('goal:2026-11-01',{id:'goal:2026-11-01',data:{value:450},revision:2})};
+ await h.run('cloudSyncPlanning()');
+ assert.equal(server.rows.get('goal:2026-11-01').data.value,450);
+ assert.equal(h.run("loadPlans()['month:2026-11-01'].daily"),420);
+ assert.match(h.el('plan-cloud-status').textContent,/Alteração simultânea/);
+ await h.run('cloudSyncPlanning()');
+ assert.equal(h.run('planningConflicts.size'),1);
+});
+
+test('restoring a default day and deleting output propagate as tombstones without stale-PC resurrection',async()=>{
+ const a=harness(),b=harness(),server=sharedPlanningServer(a,b);
+ storePlanning(a,{calendar:{'2026-12-24':false},outputs:{'2026-11-24':450}});
+ await a.run('cloudSyncPlanning()');await b.run('cloudSyncPlanning()');
+ a.run("applyPlanningRecord('calendar:2026-12-24',{value:null});applyPlanningRecord('output:2026-11-24',{value:null})");
+ await a.run('cloudSyncPlanning()');await b.run('cloudSyncPlanning()');
+ assert.equal(b.run("loadWorkCalendar()['2026-12-24']"),undefined);
+ assert.equal(b.run("loadDailySewing()['2026-11-24']"),undefined);
+ assert.equal(server.rows.get('calendar:2026-12-24').data.value,null);
+ assert.equal(server.rows.get('output:2026-11-24').data.value,null);
+});
+
+test('offline planning changes stay local and cannot be reported as saved in the cloud',async()=>{
+ const h=harness();sharedPlanningServer(h);storePlanning(h,{plans:{'month:2026-11-01':{daily:400}}});
+ h.context.fetch=async()=>{throw Error('network unavailable')};
+ await h.run('cloudSyncPlanning()');
+ assert.equal(h.run("loadPlans()['month:2026-11-01'].daily"),400);
+ assert.match(h.el('plan-cloud-status').textContent,/não sincronizado/);
+ assert.doesNotMatch(h.el('plan-cloud-status').textContent,/salvo na nuvem/);
+});
+
+test('planning synchronization still runs after an unrelated purchase synchronization failure',async()=>{
+ const h=harness(),server=sharedPlanningServer(h);
+ storePlanning(h,{plans:{'month:2026-11-01':{daily:400}}});
+ h.run("cloudSyncMaterials=async()=>{$('cloud-sync-message').textContent='Falha nas compras'}");
+ await h.run('cloudSyncAll(true)');
+ assert.equal(server.rows.get('goal:2026-11-01').data.value,400);
+ assert.match(h.el('cloud-sync-message').textContent,/Falha nas compras/);
+ assert.equal(h.el('cloud-sync-btn').classes.has('sync-retry'),true);
+});
+
+test('logout revokes only the current device session',async()=>{
+ const h=harness();h.run("cloudSession={access_token:'current-device-token',user_id:'user'}");
+ await h.run('cloudLogout()');
+ assert.match(h.requests.at(-1).url,/\/logout\?scope=local$/);
+ assert.equal(h.run('cloudSession'),null);
+});
+
+test('login identifies incorrect credentials versus unconfirmed email without opening protected data',async()=>{
+ const h=harness();h.el('cloud-email').value=' person@example.test ';h.el('cloud-password').value='test-password';
+ h.context.fetch=async()=>({ok:false,status:400,json:async()=>({error_code:'invalid_credentials',msg:'Invalid login credentials'})});
+ await h.el('cloud-login-form').handlers.submit({preventDefault(){}});
+ assert.match(h.el('cloud-login-message').textContent,/E-mail ou senha incorretos/);
+ assert.equal(h.run('cloudSession'),null);
+ h.context.fetch=async()=>({ok:false,status:400,json:async()=>({error_code:'email_not_confirmed'})});
+ await h.el('cloud-login-form').handlers.submit({preventDefault(){}});
+ assert.match(h.el('cloud-login-message').textContent,/Confirme seu e-mail/);
+ assert.equal(h.el('cloud-login-submit').disabled,false);
+});
+
+test('password recovery uses the site origin and does not report success after a rejected request',async()=>{
+ const h=harness();
+ await h.el('cloud-recover').onclick();assert.equal(h.requests.length,0);
+ h.el('cloud-email').value='person@example.test';
+ await h.el('cloud-recover').onclick();
+ const request=h.requests.at(-1),url=new URL(request.url);
+ assert.equal(url.pathname,'/auth/v1/recover');assert.equal(url.searchParams.get('redirect_to'),'https://example.test/');
+ assert.equal(JSON.parse(request.options.body).email,'person@example.test');
+ assert.match(h.el('cloud-login-message').textContent,/Se houver uma conta/);
+ h.context.fetch=async()=>({ok:false,status:429,json:async()=>({error_code:'over_email_send_rate_limit'})});
+ await h.el('cloud-recover').onclick();
+ assert.match(h.el('cloud-login-message').textContent,/Muitas tentativas/);
+});
+
+test('recovery callback clears URL credentials and requires verified recovery before a user can set a password',async()=>{
+ const h=harness(),history=[];
+ h.context.location.href='https://example.test/?versao=127#type=recovery&access_token=test-recovery-token';
+ h.context.history.replaceState=(state,title,url)=>history.push(url);
+ h.context.fetch=async()=>({ok:true,status:200,json:async()=>({id:'test-user',email:'person@example.test'})});
+ await h.run('handleCloudRecovery()');
+ assert.deepEqual(history,['/?versao=127']);
+ assert.equal(h.el('cloud-reset-form').hidden,false);
+ assert.equal(h.el('cloud-login-form').hidden,true);
+ assert.equal(h.run('cloudSession'),null);
+ h.el('cloud-new-password').value='test-new-password';h.el('cloud-confirm-password').value='different-password';
+ await h.el('cloud-reset-form').onsubmit({preventDefault(){}});
+ assert.match(h.el('cloud-reset-message').textContent,/mesma senha/);
+ h.el('cloud-confirm-password').value='test-new-password';
+ await h.el('cloud-reset-form').onsubmit({preventDefault(){}});
+ assert.equal(h.el('cloud-new-password').value,'');assert.equal(h.el('cloud-password').value,'');
+ assert.equal(h.el('cloud-reset-form').hidden,true);
+ assert.match(h.el('cloud-login-message').textContent,/Senha atualizada/);
+});
+
+test('expired recovery links never open the new-password form',async()=>{
+ const h=harness();h.context.location.href='https://example.test/#type=recovery&access_token=expired-test-token';
+ h.context.fetch=async()=>({ok:false,status:401,json:async()=>({message:'expired'})});
+ await h.run('handleCloudRecovery()');
+ assert.notEqual(h.el('cloud-reset-form').hidden,false);
+ assert.equal(h.run('cloudRecoverySession'),null);
+ assert.match(h.el('cloud-login-message').textContent,/expirou/);
+});
+
+test('network timeouts finish requests with an actionable message and release the timer',async()=>{
+ const h=harness();let timer,cleared=false;
+ h.context.AbortController=AbortController;
+ h.context.setTimeout=fn=>{timer=fn;return 1};h.context.clearTimeout=()=>{cleared=true};
+ h.context.fetch=(url,{signal})=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(Object.assign(new Error('timeout'),{name:'AbortError'}))));
+ const pending=h.run("cloudFetch('https://example.test/api')");
+ timer();
+ await assert.rejects(pending,/demorou para responder/);
+ assert.equal(cleared,true);
+});
+
+test('a brand edited during synchronization acknowledges only the exact version sent',async()=>{
+ const h=harness(),original={id:'lot',parentId:'parent',brand:'A',status:'Corte'};
+ h.seed({lots:[{...original,status:'Costura'}]});h.run("cloudSession={access_token:'test',user_id:'user'}");
+ h.storage.set('lobo-industrial-lotes-cloud-base-v1',JSON.stringify({lot:h.run('cloudLotJson('+JSON.stringify(original)+')')}));
+ let remote=original,revision='v1',writes=0;
+ h.context.fetch=async(url,options={})=>{
+  if(options.method==='PATCH'){
+   remote=JSON.parse(options.body).data;revision='v'+(++writes+1);
+   if(writes===1)h.run("lots[0].status='Embalagem'");
+   return {ok:true,status:200,json:async()=>[{id:'lot',data:remote,updated_at:revision}]};
+  }
+  return {ok:true,status:200,json:async()=>[{id:'lot',data:remote,updated_at:revision}]};
+ };
+ await h.run('cloudSyncLots(true)');
+ assert.equal(remote.status,'Costura');assert.equal(state(h).lots[0].status,'Embalagem');
+ assert.equal(JSON.parse(JSON.parse(h.storage.get('lobo-industrial-lotes-cloud-base-v1')).lot).status,'Costura');
+ await h.run('cloudSyncLots(true)');assert.equal(remote.status,'Embalagem');assert.equal(writes,2);
+});
+
+test('a cut edited during upload remains dirty until the newer piece count is acknowledged',async()=>{
+ const h=harness(),original={id:'cut',parentId:'parent',kg:10,pieces:100};
+ h.seed({parents:[{id:'parent'}],cuts:[{...original,pieces:110}]});h.run("cloudSession={access_token:'test',user_id:'user'}");
+ h.storage.set('lobo-industrial-cortes-cloud-base-v1',JSON.stringify({cut:h.run('cloudLotJson('+JSON.stringify(original)+')')}));
+ let remote=original,writes=0;
+ h.context.fetch=async(url,options={})=>{
+  if(url.includes('/fabric_purchases'))return {ok:true,status:200,json:async()=>[{id:'parent',data:{id:'parent'}}]};
+  if(options.method==='PATCH'){
+   remote=JSON.parse(options.body).data;
+   if(++writes===1)h.run('cuts[0].pieces=120');
+  }
+  return {ok:true,status:200,json:async()=>[{id:'cut',data:remote,updated_at:'v'+writes}]};
+ };
+ await h.run('cloudSyncCuts(true)');
+ assert.equal(remote.pieces,110);assert.equal(state(h).cuts[0].pieces,120);
+ assert.equal(JSON.parse(JSON.parse(h.storage.get('lobo-industrial-cortes-cloud-base-v1')).cut).pieces,110);
+ await h.run('cloudSyncCuts(true)');assert.equal(remote.pieces,120);assert.equal(writes,2);
+});
+
+test('cost changes made during upload do not disappear into the synchronization baseline',async()=>{
+ const h=harness(),original={good:100,history:[{total:1000}]};
+ h.seed({lots:[{id:'lot'}],costData:{lot:{good:100,history:[{total:1200}]}}});h.run("cloudSession={access_token:'test',user_id:'user'}");
+ h.storage.set('lobo-industrial-custos-base-v1',JSON.stringify({lot:h.run('cloudLotJson('+JSON.stringify(original)+')')}));
+ let remote=original,writes=0;
+ h.context.fetch=async(url,options={})=>{
+  if(url.includes('/production_lots'))return {ok:true,status:200,json:async()=>[{id:'lot',data:{id:'lot'}}]};
+  if(options.method==='PATCH'){
+   remote=JSON.parse(options.body).data;
+   if(++writes===1)h.run('costData.lot.history[0].total=1400');
+  }
+  return {ok:true,status:200,json:async()=>[{lot_id:'lot',data:remote,updated_at:'v'+writes}]};
+ };
+ await h.run('cloudSyncCosts(true)');
+ assert.equal(remote.history[0].total,1200);assert.equal(state(h).costData.lot.history[0].total,1400);
+ assert.equal(JSON.parse(JSON.parse(h.storage.get('lobo-industrial-custos-base-v1')).lot).history[0].total,1200);
+ await h.run('cloudSyncCosts(true)');assert.equal(remote.history[0].total,1400);assert.equal(writes,2);
+});
+
+test('a late brand download never overwrites an edit made while a different brand is being uploaded',async()=>{
+ const h=harness(),one={id:'a',parentId:'parent',brand:'A'},two={id:'b',parentId:'parent',brand:'B'};
+ h.seed({lots:[{...one,brand:'A-edited'},two]});h.run("cloudSession={access_token:'test',user_id:'user'}");
+ h.storage.set('lobo-industrial-lotes-cloud-base-v1',JSON.stringify({a:h.run('cloudLotJson('+JSON.stringify(one)+')'),b:h.run('cloudLotJson('+JSON.stringify(two)+')')}));
+ h.context.fetch=async(url,options={})=>{
+  if(options.method==='PATCH'){
+   h.run("lots.find(l=>l.id==='b').brand='B-local'");
+   return {ok:true,status:200,json:async()=>[{id:'a',data:JSON.parse(options.body).data,updated_at:'v2'}]};
+  }
+  return {ok:true,status:200,json:async()=>[{id:'a',data:one,updated_at:'v1'},{id:'b',data:{...two,brand:'B-cloud'},updated_at:'v2'}]};
+ };
+ await h.run('cloudSyncLots(true)');
+ assert.equal(state(h).lots.find(l=>l.id==='b').brand,'B-local');
+ assert.equal(JSON.parse(JSON.parse(h.storage.get('lobo-industrial-lotes-cloud-base-v1')).b).brand,'B');
 });

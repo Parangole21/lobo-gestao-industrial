@@ -57,5 +57,36 @@ drop trigger if exists sewing_planning_revision on public.sewing_planning;
 create trigger sewing_planning_revision before update on public.sewing_planning
 for each row execute function public.sewing_planning_revision();
 
+-- Verifica o caminho autenticado sem persistir registros de teste nem expor contas.
+do $$
+declare
+ actor uuid;
+ writable integer=0;
+begin
+ if has_table_privilege('anon','public.sewing_planning','SELECT') or has_table_privilege('anon','public.sewing_planning','INSERT') or has_table_privilege('anon','public.sewing_planning','UPDATE') then
+  raise exception 'Planejamento não pode permitir acesso anônimo.';
+ end if;
+ for actor in select user_id from public.profiles where active=true loop
+  perform set_config('request.jwt.claims',json_build_object('sub',actor,'role','authenticated')::text,true);
+  execute 'set local role authenticated';
+  begin
+   insert into public.sewing_planning(id,data,updated_by) values('__migration_probe_20261124__','{"value":1}',actor);
+   update public.sewing_planning set data='{"value":2}' where id='__migration_probe_20261124__' and revision=1;
+   if (select revision from public.sewing_planning where id='__migration_probe_20261124__') is distinct from 2 then
+    raise exception 'A confirmação de revisão do planejamento falhou.';
+   end if;
+   writable=writable+1;
+   raise exception using errcode='Z0001',message='Rollback do registro temporário de verificação';
+  exception
+   when sqlstate 'Z0001' then null;
+   when insufficient_privilege then null;
+  end;
+  execute 'reset role';
+ end loop;
+ if writable=0 then raise exception 'Nenhuma conta ativa conseguiu confirmar o salvamento do planejamento.'; end if;
+ raise notice 'Planejamento: escrita autenticada e revisão verificadas para % conta(s); nenhum registro de teste foi persistido.',writable;
+end;
+$$;
+
 notify pgrst, 'reload schema';
 commit;
