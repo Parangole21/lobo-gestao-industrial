@@ -41,6 +41,115 @@ function overflowForecast(h,date='2026-11-01'){
  return JSON.parse(h.run(`JSON.stringify(sewingOverflowForecast(planMonth('${date}'),planToday()))`));
 }
 
+test('recorded daily totals never supply a goal when no goal has been saved',()=>{
+ const h=harness();
+ h.run("planToday=()=> '2026-11-24'");
+ h.seed({parents:[{id:'p'}],cuts:[{parentId:'p',pieces:10000}]});
+ h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{queue:['p']}}));
+  localStorage.setItem(dailySewingKey(),JSON.stringify({'2026-11-19':450,'2026-11-23':400}));showSewingPlan()`);
+ assert.equal(h.el('plan-daily').value,'');
+ assert.match(h.el('plan-daily-source').textContent,/Informe a meta diária/);
+ assert.match(h.el('plan-query-result').innerHTML,/Capacidade para <strong>0<\/strong>/);
+ assert.equal(h.run("loadPlan(planMonth('2026-12-01')).daily"),0);
+ h.el('plan-daily').value='350';h.el('plan-capacity-form').onsubmit({preventDefault(){}});
+ assert.equal(h.el('plan-daily').value,'350');
+ assert.equal(h.run("loadPlan(planMonth('2026-12-01')).daily"),350);
+ assert.match(h.el('plan-query-result').innerHTML,/Capacidade para <strong>1\.750<\/strong>/);
+});
+
+test('monthly cards open their exact brands and pieces and preserve the original date filter',()=>{
+ const h=harness();
+ h.run("planToday=()=> '2026-11-30'");
+ h.seed({parents:[{id:'a',number:'MAL-0001'},{id:'b',number:'MAL-0002'}],
+  cuts:[{parentId:'a',pieces:250},{parentId:'b',pieces:50}],
+  lots:[{parentId:'a',brand:'Alfa',model:'Polo',quantity:250,status:'Corte'},{parentId:'b',brand:'Beta',quantity:50,status:'Corte'}]});
+ h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({
+  'month:2026-11-01':{daily:100,queue:['a']},
+  'month:2026-12-01':{daily:5,queue:['b']},
+  'month:2027-01-01':{daily:100,queue:['b']}
+ }));showSewingPlan()`);
+ const start=h.el('plan-query-start'),end=h.el('plan-query-end');
+ start.value='2026-11-30';start.onchange();end.value='2027-01-31';end.onchange();
+ assert.match(h.el('plan-capacity').innerHTML,/data-plan-month="2027-01-01"[^>]*><span>Janeiro de 2027<\/span><strong>40/);
+ h.el('plan-capacity').onclick({target:{closest:()=>({dataset:{planMonth:'2027-01-01'}})}});
+ assert.equal(h.el('plan-details').hidden,false);
+ assert.equal(h.el('plan-overview').hidden,true);
+ assert.match(h.el('plan-detail-range').textContent,/01\/01\/2027 a 31\/01\/2027 · 40 peças programadas/);
+ assert.match(h.el('plan-detail-result').innerHTML,/MAL-0001[\s\S]*Alfa · Polo/);
+ assert.doesNotMatch(h.el('plan-detail-result').innerHTML,/Beta|MAL-0002/);
+ assert.equal(h.run("sewingQuerySummary({start:'2027-01-01',end:'2027-01-31'}).total"),90);
+ h.run('renderSewingPlan()');
+ assert.match(h.el('plan-detail-range').textContent,/40 peças programadas/);
+ assert.equal(start.value,'2026-11-30');assert.equal(end.value,'2027-01-31');
+ h.el('plan-detail-back').onclick();
+ assert.equal(h.el('plan-details').hidden,true);
+ assert.equal(h.el('plan-overview').hidden,false);
+ assert.equal(start.value,'2026-11-30');assert.equal(end.value,'2027-01-31');
+ assert.match(h.el('plan-detail-range').textContent,/300 peças programadas/);
+});
+
+test('calendar navigates future months and recalculates a two-month query without changing the filter',()=>{
+ const h=harness();
+ h.run("planToday=()=> '2026-11-30'");
+ h.seed({parents:[{id:'p',number:'MAL-0001'}],cuts:[{parentId:'p',pieces:10000}]});
+ h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:100,queue:['p']}}));showSewingPlan()`);
+ const start=h.el('plan-query-start'),end=h.el('plan-query-end');
+ start.value='2026-12-01';start.onchange();end.value='2027-01-31';end.onchange();
+ const result=h.el('plan-query-result');
+ assert.match(result.innerHTML,/Capacidade para <strong>4\.200<\/strong>/);
+ const save=(date,working)=>{
+  h.el('plan-calendar-date').value=date;h.el('plan-calendar-working').value=working;
+  h.el('plan-calendar-form').onsubmit({preventDefault(){}});
+ };
+ assert.equal(h.el('plan-calendar-month').value,'2026-12');
+ save('2026-12-15','off');
+ assert.match(result.innerHTML,/Capacidade para <strong>4\.100<\/strong>/);
+ h.el('plan-calendar-next').onclick();
+ assert.equal(h.el('plan-calendar-month').value,'2027-01');
+ assert.equal(h.el('plan-calendar-date').min,'2027-01-01');
+ assert.equal(h.el('plan-calendar-date').max,'2027-01-31');
+ save('2027-01-05','off');
+ assert.match(result.innerHTML,/Capacidade para <strong>4\.000<\/strong>/);
+ assert.match(h.el('plan-calendar-list').innerHTML,/05\/01\/2027 · Folga/);
+ assert.doesNotMatch(h.el('plan-calendar-list').innerHTML,/15\/12\/2026/);
+ assert.equal(start.value,'2026-12-01');assert.equal(end.value,'2027-01-31');
+ const summary=JSON.parse(h.run("JSON.stringify(sewingQuerySummary({start:'2026-12-01',end:'2027-01-31'}))"));
+ assert.ok(summary.scheduled.every(day=>!['2026-12-15','2027-01-05'].includes(day.date)));
+ h.el('plan-calendar-prev').onclick();
+ assert.match(h.el('plan-calendar-list').innerHTML,/15\/12\/2026 · Folga/);
+ save('2026-12-26','work');
+ assert.match(result.innerHTML,/Capacidade para <strong>4\.100<\/strong>/);
+ h.el('plan-calendar-list').onclick({target:{closest:()=>({dataset:{planRestoreDay:'2026-12-15'}})}});
+ assert.match(result.innerHTML,/Capacidade para <strong>4\.200<\/strong>/);
+ h.el('plan-calendar-month').value='2027-01';h.el('plan-calendar-month').onchange();
+ assert.match(h.el('plan-calendar-list').innerHTML,/05\/01\/2027 · Folga/);
+ assert.equal(h.run("loadWorkCalendar()['2027-01-05']"),false);
+ assert.equal(h.run("loadWorkCalendar()['2026-12-26']"),true);
+ assert.equal(h.run("loadWorkCalendar()['2026-12-15']"),undefined);
+});
+
+test('monthly detail can open its future calendar and recalculate the month after a day off',()=>{
+ const h=harness();
+ h.run("planToday=()=> '2026-11-30'");
+ h.seed({parents:[{id:'p',kg:100,simulatedPieces:10000}],cuts:[]});
+ h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:100,queue:['p']}}));showSewingPlan()`);
+ const open=()=>h.el('plan-capacity').onclick({target:{closest:()=>({dataset:{planMonth:'2026-12-01'}})}});
+ open();
+ assert.match(h.el('plan-detail-range').textContent,/2\.200 peças programadas/);
+ assert.match(h.el('plan-detail-result').innerHTML,/simuladas/);
+ h.el('plan-detail-calendar').onclick();
+ assert.equal(h.el('plan-calendar-month').value,'2026-12');
+ assert.equal(h.el('plan-calendar').open,true);
+ assert.equal(h.el('plan-overview').hidden,false);
+ assert.equal(h.el('plan-details').hidden,true);
+ h.el('plan-calendar-date').value='2026-12-15';h.el('plan-calendar-working').value='off';
+ h.el('plan-calendar-form').onsubmit({preventDefault(){}});
+ assert.match(h.el('plan-capacity').innerHTML,/Dezembro de 2026<\/span><strong>2\.100/);
+ open();
+ assert.match(h.el('plan-detail-range').textContent,/2\.100 peças programadas/);
+ assert.doesNotMatch(h.el('plan-detail-result').innerHTML,/>15\/12\/2026</);
+});
+
 test('monthly cards split 10790 pieces between December and January without displaying a combined total',()=>{
  const h=harness();
  h.run("planToday=()=> '2026-11-30'");
@@ -456,13 +565,10 @@ test('sewing planner UI keeps capacity and simulations per period and restores n
  assert.equal(h.el('page-planejamento').style.display,'none');
 });
 
-test('daily sewing progress carries a surplus or shortfall into the remaining target',()=>{
+test('daily sewing quantities do not change the saved goal or the capacity of remaining days',()=>{
  const h=harness();
  const progress=pieces=>JSON.parse(h.run(`JSON.stringify(sewingProgress({daily:400,days:5},[['2026-11-24',${pieces}]],productionDates(planMonth('2026-11-24')), '2026-11-24'))`));
- assert.deepEqual(progress(450),{produced:450,daysLeft:4,targetLeft:1550,budget:1550,gap:0});
- assert.deepEqual(progress(350),{produced:350,daysLeft:4,targetLeft:1650,budget:1600,gap:50});
- assert.deepEqual(progress(0),{produced:0,daysLeft:4,targetLeft:2000,budget:1600,gap:400});
- assert.deepEqual(progress(2100),{produced:2100,daysLeft:4,targetLeft:0,budget:0,gap:0});
+ for(const pieces of [450,350,0,2100])assert.deepEqual(progress(pieces),{produced:pieces,daysLeft:4,targetLeft:1600,budget:1600,gap:0});
 });
 
 test('saving, correcting and deleting a daily sewing total updates the monthly plan and date filter',()=>{
@@ -479,14 +585,14 @@ test('saving, correcting and deleting a daily sewing total updates the monthly p
  const outputDate=h.el('plan-output-date'),pieces=h.el('plan-output-pieces');
  outputDate.value='2026-11-24';outputDate.onchange();
  pieces.value='450';h.el('plan-output-form').onsubmit({preventDefault});
- assert.match(h.el('plan-detail-range').textContent,/1\.550 peças programadas/);
- assert.match(h.el('plan-stock').innerHTML,/1\.550 peças no plano/);
- assert.match(h.el('plan-detail-result').innerHTML,/Capacidade: 1\.600 peças · Vagas na capacidade: 50 peças/);
- assert.match(h.el('plan-capacity').innerHTML,/Vagas na capacidade do mês<\/span><strong>50/);
+ assert.match(h.el('plan-detail-range').textContent,/1\.600 peças programadas/);
+ assert.match(h.el('plan-stock').innerHTML,/1\.600 peças no plano/);
+ assert.match(h.el('plan-detail-result').innerHTML,/Capacidade: 1\.600 peças · Vagas na capacidade: 0 peças/);
+ assert.match(h.el('plan-capacity').innerHTML,/Vagas na capacidade do mês<\/span><strong>0/);
  const piecesByRow=[...h.el('plan-detail-result').innerHTML.matchAll(/<td class="plan-query-number">([\d.]+)<\/td>/g)];
- assert.equal(piecesByRow.reduce((sum,row)=>sum+Number(row[1].replaceAll('.','')),0),1550);
+ assert.equal(piecesByRow.reduce((sum,row)=>sum+Number(row[1].replaceAll('.','')),0),1600);
  pieces.value='460';h.el('plan-output-form').onsubmit({preventDefault});
- assert.match(h.el('plan-detail-range').textContent,/1\.540 peças programadas/);
+ assert.match(h.el('plan-detail-range').textContent,/1\.600 peças programadas/);
  assert.equal((h.el('plan-output-entries').innerHTML.match(/class="plan-output-entry"/g)||[]).length,1);
  assert.match(h.el('plan-output-entries').innerHTML,/24\/11\/2026[\s\S]*460 peças/);
  h.el('plan-output-entries').onclick({target:{closest:()=>({dataset:{outputDelete:'2026-11-24'}})}});
@@ -880,7 +986,7 @@ test('cloud refresh waits for each active lot status selector and coalesces repe
  }
 });
 
-test('opening sewing planning shows the remaining current month at the latest recorded daily pace',()=>{
+test('opening sewing planning uses the saved goal and previous goal instead of the latest daily output',()=>{
  const h=harness();
  h.run("planToday=()=> '2026-11-16'");
  h.seed({parents:[{id:'p',number:'MAL-0001'}],cuts:[{parentId:'p',pieces:4000}]});
@@ -892,32 +998,32 @@ test('opening sewing planning shows the remaining current month at the latest re
  showSewingPlan();`);
  const result=h.el('plan-query-result');
  const daily=h.el('plan-daily');
- assert.match(result.innerHTML,/Capacidade para <strong>2\.880<\/strong> peças/);
+ assert.match(result.innerHTML,/Capacidade para <strong>3\.600<\/strong> peças/);
  assert.match(result.innerHTML,/16\/11\/2026 a 30\/11\/2026/);
- assert.match(h.el('plan-capacity').innerHTML,/320 peças\/dia × 9 dias/);
- assert.equal(daily.value,'320');
- assert.match(h.el('plan-daily-source').textContent,/16\/11\/2026/);
+ assert.match(h.el('plan-capacity').innerHTML,/400 peças\/dia × 9 dias/);
+ assert.equal(daily.value,'400');
+ assert.match(h.el('plan-daily-source').textContent,/Última meta diária salva/);
  assert.doesNotMatch(h.el('plan-detail-result').innerHTML,/>16\/11\/2026<|>20\/11\/2026</);
 
- daily.value='400';
+ daily.value='350';
  h.run('renderSewingPlan()');
- assert.equal(daily.value,'400');
+ assert.equal(daily.value,'350');
  h.el('plan-capacity-form').onsubmit({preventDefault(){}});
  assert.equal(h.el('plan-daily-auto').hidden,false);
- assert.match(h.el('plan-capacity').innerHTML,/400 peças\/dia × 9 dias/);
+ assert.match(h.el('plan-capacity').innerHTML,/350 peças\/dia × 9 dias/);
  h.el('plan-query-start').value='2026-12-01';h.el('plan-query-start').onchange();
  h.run('showSewingPlan()');
  assert.equal(h.el('plan-query-start').value,'');
- assert.equal(daily.value,'400');
+ assert.equal(daily.value,'350');
  h.el('plan-daily-auto').onclick();
- assert.equal(daily.value,'320');
+ assert.equal(daily.value,'400');
  assert.equal(h.el('plan-daily-auto').hidden,true);
- assert.match(result.innerHTML,/Capacidade para <strong>2\.880<\/strong> peças/);
+ assert.match(result.innerHTML,/Capacidade para <strong>3\.600<\/strong> peças/);
 
  h.el('plan-output-pieces').value='380';
  h.el('plan-output-form').onsubmit({preventDefault(){}});
- assert.equal(daily.value,'380');
- assert.match(result.innerHTML,/Capacidade para <strong>3\.420<\/strong> peças/);
+ assert.equal(daily.value,'400');
+ assert.match(result.innerHTML,/Capacidade para <strong>3\.600<\/strong> peças/);
  assert.equal(h.run("loadPlans()['month:2026-11-01'].daily"),undefined);
 });
 
