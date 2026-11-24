@@ -41,7 +41,7 @@ function overflowForecast(h,date='2026-11-01'){
  return JSON.parse(h.run(`JSON.stringify(sewingOverflowForecast(planMonth('${date}'),planToday()))`));
 }
 
-test('overflow card splits 10790 pieces between named December and January without changing saved data',()=>{
+test('monthly cards split 10790 pieces between December and January without displaying a combined total',()=>{
  const h=harness();
  h.run("planToday=()=> '2026-11-30'");
  h.seed({parents:[{id:'a',number:'MAL-0001'}],cuts:[{parentId:'a',pieces:11190}]});
@@ -53,9 +53,9 @@ test('overflow card splits 10790 pieces between named December and January witho
  assert.equal(result.remaining,0);
  h.run('showSewingPlan()');
  const card=h.el('plan-capacity').innerHTML;
- assert.match(card,/Passam para os próximos meses<\/span><strong>10\.790<\/strong>/);
- assert.match(card,/Dezembro de 2026<\/span><b>8\.800 peças/);
- assert.match(card,/Janeiro de 2027<\/span><b>1\.990 peças/);
+ assert.doesNotMatch(card,/Passam para os próximos meses|10\.790/);
+ assert.match(card,/Dezembro de 2026<\/span><strong>8\.800<\/strong><span>peças previstas/);
+ assert.match(card,/Janeiro de 2027<\/span><strong>1\.990<\/strong><span>peças previstas/);
  assert.doesNotMatch(card,/Fevereiro de 2027/);
  assert.deepEqual([...h.storage],storage);
  assert.deepEqual(state(h),before);
@@ -93,7 +93,7 @@ test('overflow keeps a zero-capacity December visible and continues through Janu
  assert.deepEqual(result.forecast.map(m=>[m.period.key,m.pieces]),[['month:2026-12-01',0],['month:2027-01-01',8000],['month:2027-02-01',5790]]);
  assert.equal(result.remaining,0);
  h.run('showSewingPlan()');
- assert.match(h.el('plan-capacity').innerHTML,/Dezembro de 2026<\/span><b>0 peças/);
+ assert.match(h.el('plan-capacity').innerHTML,/Dezembro de 2026<\/span><strong>0<\/strong><span>peças previstas/);
 });
 
 test('overflow preserves real versus simulated quantities in each future month',()=>{
@@ -109,8 +109,8 @@ test('overflow preserves real versus simulated quantities in each future month',
  assert.equal(result.month.allocation.overflow,900);
  assert.deepEqual(result.forecast.map(m=>[m.pieces,m.ready,m.estimate]),[[220,100,120],[680,0,680]]);
  h.run('showSewingPlan()');
- assert.match(h.el('plan-capacity').innerHTML,/Dezembro de 2026[\s\S]*220 peças[\s\S]*120 simuladas/);
- assert.match(h.el('plan-capacity').innerHTML,/Janeiro de 2027[\s\S]*680 peças[\s\S]*680 simuladas/);
+ assert.match(h.el('plan-capacity').innerHTML,/Dezembro de 2026[\s\S]*<strong>220<\/strong>[\s\S]*120 simuladas/);
+ assert.match(h.el('plan-capacity').innerHTML,/Janeiro de 2027[\s\S]*<strong>680<\/strong>[\s\S]*680 simuladas/);
 });
 
 test('future-month overflow starts after the selected month and never repeats earlier allocations',()=>{
@@ -136,7 +136,7 @@ test('overflow never disappears with no daily goal or with backlog beyond the tw
  assert.equal(result.remaining,10000);
  assert.equal(result.forecast.length,12);
  h.run('showSewingPlan()');
- assert.match(h.el('plan-capacity').innerHTML,/Passam para os próximos meses<\/span><strong>10\.000/);
+ assert.doesNotMatch(h.el('plan-capacity').innerHTML,/Passam para os próximos meses|<strong>10\.000/);
  assert.match(h.el('plan-capacity').innerHTML,/Sem programação nos próximos 12 meses/);
  h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:1,queue:['a']}}))`);
  result=overflowForecast(h);
@@ -148,7 +148,7 @@ test('overflow never disappears with no daily goal or with backlog beyond the tw
  assert.match(h.el('plan-capacity').innerHTML,/peças ainda na fila/);
 });
 
-test('no overflow produces no future reservations and shows an empty-state message',()=>{
+test('no overflow produces no future reservations or monthly cards',()=>{
  const h=harness();
  h.run("planToday=()=> '2026-11-30'");
  h.seed({parents:[{id:'a'},{id:'future'}],cuts:[{parentId:'a',pieces:100},{parentId:'future',pieces:500}]});
@@ -160,7 +160,7 @@ test('no overflow produces no future reservations and shows an empty-state messa
  assert.deepEqual(result.forecast,[]);
  assert.equal(result.remaining,0);
  h.run('showSewingPlan()');
- assert.match(h.el('plan-capacity').innerHTML,/Nenhuma peça aguardando o próximo mês/);
+ assert.doesNotMatch(h.el('plan-capacity').innerHTML,/plan-overflow-months|Passam para os próximos meses/);
  assert.doesNotMatch(h.el('plan-capacity').innerHTML,/Dezembro de 2026/);
 });
 
