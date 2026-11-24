@@ -1,0 +1,35 @@
+name: Ativar sincronização do planejamento
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - sql/planejamento-costura.sql
+      - .github/workflows/planejamento-costura.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sewing-planning-schema
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Criar armazenamento compartilhado com as permissões existentes
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${SUPABASE_DB_URL}" != *yldgebyfflbacicsfseh* ]]; then
+            echo "::error::A conexão não corresponde ao projeto Lobo Industrial."
+            exit 1
+          fi
+          command -v psql >/dev/null || { sudo apt-get update && sudo apt-get install -y postgresql-client; }
+          PGCONNECT_TIMEOUT=15 psql "${SUPABASE_DB_URL}" -X -v ON_ERROR_STOP=1 -f sql/planejamento-costura.sql
