@@ -245,7 +245,7 @@ test('overflow never disappears with no daily goal or with backlog beyond the tw
  assert.equal(result.remaining,10000);
  assert.equal(result.forecast.length,12);
  h.run('showSewingPlan()');
- assert.doesNotMatch(h.el('plan-capacity').innerHTML,/Passam para os próximos meses|<strong>10\.000/);
+ assert.doesNotMatch(h.el('plan-capacity').innerHTML,/Passam para os próximos meses/);
  assert.match(h.el('plan-capacity').innerHTML,/Sem programação nos próximos 12 meses/);
  h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:1,queue:['a']}}))`);
  result=overflowForecast(h);
@@ -588,7 +588,7 @@ test('saving, correcting and deleting a daily sewing total updates the monthly p
  assert.match(h.el('plan-detail-range').textContent,/1\.550 peças programadas/);
  assert.match(h.el('plan-stock').innerHTML,/1\.550 peças no plano/);
  assert.match(h.el('plan-detail-result').innerHTML,/Capacidade: 1\.600 peças · Vagas na capacidade: 50 peças/);
- assert.match(h.el('plan-capacity').innerHTML,/Vagas na capacidade do mês<\/span><strong>50/);
+ assert.match(h.el('plan-capacity').innerHTML,/Capacidade livre no calendário<\/span><strong>50/);
  const piecesByRow=[...h.el('plan-detail-result').innerHTML.matchAll(/<td class="plan-query-number">([\d.]+)<\/td>/g)];
  assert.equal(piecesByRow.reduce((sum,row)=>sum+Number(row[1].replaceAll('.','')),0),1550);
  pieces.value='460';h.el('plan-output-form').onsubmit({preventDefault});
@@ -645,7 +645,7 @@ test('monthly target and queue only count remaining production dates and update 
  h.run('showSewingPlan()');
  h.el('plan-daily').value='400';
  h.el('plan-capacity-form').onsubmit({preventDefault(){}});
- assert.match(h.el('plan-capacity').innerHTML,/Meta dos dias restantes<\/span><strong>5\.200<\/strong><span>400 peças\/dia × 13 dias/);
+ assert.match(h.el('plan-capacity').innerHTML,/Faltam para cumprir a meta<\/span><strong>5\.200<\/strong><span>400 peças\/dia × 13 dias/);
  h.el('plan-calendar-date').value='2026-11-20';
  h.el('plan-calendar-working').value='work';
  h.el('plan-calendar-form').onsubmit({preventDefault(){}});
@@ -1496,4 +1496,24 @@ test('sewing a simulated Fuji lot deducts only that lot and transitions to the r
  assert.deepEqual(stock(),[['fuji',360,0],['other',0,500]]);
  h.run("lots=[{parentId:'fuji',status:'Embalagem',quantity:420}]");
  assert.deepEqual(stock(),[['fuji',360,0],['other',0,500]]);
+});
+
+test('meeting the remaining target today leaves calendar capacity free and recalculates future months from the net lot balance',()=>{
+ const h=harness();
+ h.seed({parents:[{id:'fuji',number:'MAL-0007',kg:100,simulatedPieces:12000}]});
+ h.run("planToday=()=> '2026-11-25'; savePlan(planMonth(planToday()),{daily:400,queue:['fuji'],estimates:{}},'',true); showSewingPlan()");
+ const future=()=>JSON.parse(h.run("JSON.stringify(sewingOverflowForecast(planMonth(planToday()),planToday()).forecast.map(m=>m.pieces))"));
+ assert.deepEqual(future(),[8800,1600]);
+ const save=pieces=>{
+  h.el('plan-output-pieces').value=String(pieces);
+  h.el('plan-output-form').onsubmit({preventDefault(){}});
+ };
+ save(1600);
+ assert.match(h.el('plan-capacity').innerHTML,/Faltam para cumprir a meta<\/span><strong>0/);
+ assert.match(h.el('plan-capacity').innerHTML,/Capacidade livre no calendário<\/span><strong>1\.200<\/strong><span>3 dias/);
+ assert.match(h.el('plan-capacity').innerHTML,/Saldo da fila de costura<\/span><strong>10\.400/);
+ assert.deepEqual(future(),[8800,1600]);
+ save(2000);
+ assert.match(h.el('plan-capacity').innerHTML,/Saldo da fila de costura<\/span><strong>10\.000/);
+ assert.deepEqual(future(),[8800,1200]);
 });
