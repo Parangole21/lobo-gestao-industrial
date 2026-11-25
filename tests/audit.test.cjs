@@ -1434,3 +1434,15 @@ test('a late brand download never overwrites an edit made while a different bran
  assert.equal(state(h).lots.find(l=>l.id==='b').brand,'B-local');
  assert.equal(JSON.parse(JSON.parse(h.storage.get('lobo-industrial-lotes-cloud-base-v1')).b).brand,'B');
 });
+
+test('editing a future month goal from its schedule replaces 450 with 400 for every scheduled day',()=>{
+ const h=harness();
+ h.seed({parents:[{id:'lot',number:'MAL-0007'}],cuts:[{parentId:'lot',pieces:20000}]});
+ h.run("planToday=()=> '2026-11-30'; localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:400,queue:['lot']},'month:2026-12-01':{daily:450}}));showSewingPlan()");
+ h.el('plan-capacity').onclick({target:{closest:()=>({dataset:{planMonth:'2026-12-01'}})}});
+ assert.match(h.el('plan-detail-result').innerHTML,/450 peças\/dia/);
+ h.el('plan-detail-result').onsubmit({preventDefault(){},target:{closest:()=>({dataset:{detailGoal:'2026-12-01'},querySelector:()=>({value:'400'})})}});
+ assert.match(h.el('plan-detail-result').innerHTML,/400 peças\/dia/);
+ assert.doesNotMatch(h.el('plan-detail-result').innerHTML,/>450<\/td>/);
+ assert.equal(h.run("loadPlans()['month:2026-12-01'].daily"),400);
+});
