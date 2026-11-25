@@ -10,7 +10,7 @@ function harness() {
  const nodes = new Map(), storage = new Map(), alerts = [], requests=[];
  class Node {
   constructor(id){this.id=id;this.value='';this.textContent='';this.innerHTML='';this.style={};this.dataset={};this.disabled=false;this.checked=false;this.children=new Map();this.classes=new Set();this.classList={add:(x)=>this.classes.add(x),remove:(x)=>this.classes.delete(x),toggle:(x,b)=>b===undefined?(this.classes.has(x)?this.classes.delete(x):this.classes.add(x)):(b?this.classes.add(x):this.classes.delete(x))};}
-  addEventListener(type,fn){this.handlers??={};this.handlers[type]=fn;} setAttribute(name,value){this[name]=value;} scrollIntoView(){} focus(){} reset(){} click(){} replaceChildren(){}
+  addEventListener(type,fn){this.handlers??={};this.handlers[type]=fn;} setAttribute(name,value){this[name]=value;} insertAdjacentHTML(position,markup){this.innerHTML+=markup;} scrollIntoView(){} focus(){} reset(){} click(){} replaceChildren(){}
   querySelector(selector){if(!this.children.has(selector))this.children.set(selector,new Node(selector));return this.children.get(selector);}
   querySelectorAll(){return [];} closest(){return null;}
  }
@@ -585,14 +585,14 @@ test('saving, correcting and deleting a daily sewing total updates the monthly p
  const outputDate=h.el('plan-output-date'),pieces=h.el('plan-output-pieces');
  outputDate.value='2026-11-24';outputDate.onchange();
  pieces.value='450';h.el('plan-output-form').onsubmit({preventDefault});
- assert.match(h.el('plan-detail-range').textContent,/1\.600 peças programadas/);
- assert.match(h.el('plan-stock').innerHTML,/1\.600 peças no plano/);
- assert.match(h.el('plan-detail-result').innerHTML,/Capacidade: 1\.600 peças · Vagas na capacidade: 0 peças/);
- assert.match(h.el('plan-capacity').innerHTML,/Vagas na capacidade do mês<\/span><strong>0/);
+ assert.match(h.el('plan-detail-range').textContent,/1\.550 peças programadas/);
+ assert.match(h.el('plan-stock').innerHTML,/1\.550 peças no plano/);
+ assert.match(h.el('plan-detail-result').innerHTML,/Capacidade: 1\.600 peças · Vagas na capacidade: 50 peças/);
+ assert.match(h.el('plan-capacity').innerHTML,/Vagas na capacidade do mês<\/span><strong>50/);
  const piecesByRow=[...h.el('plan-detail-result').innerHTML.matchAll(/<td class="plan-query-number">([\d.]+)<\/td>/g)];
- assert.equal(piecesByRow.reduce((sum,row)=>sum+Number(row[1].replaceAll('.','')),0),1600);
+ assert.equal(piecesByRow.reduce((sum,row)=>sum+Number(row[1].replaceAll('.','')),0),1550);
  pieces.value='460';h.el('plan-output-form').onsubmit({preventDefault});
- assert.match(h.el('plan-detail-range').textContent,/1\.600 peças programadas/);
+ assert.match(h.el('plan-detail-range').textContent,/1\.540 peças programadas/);
  assert.equal((h.el('plan-output-entries').innerHTML.match(/class="plan-output-entry"/g)||[]).length,1);
  assert.match(h.el('plan-output-entries').innerHTML,/24\/11\/2026[\s\S]*460 peças/);
  h.el('plan-output-entries').onclick({target:{closest:()=>({dataset:{outputDelete:'2026-11-24'}})}});
@@ -1461,4 +1461,22 @@ test('saving the main target removes stale future overrides in the total and mon
  h.el('plan-capacity').onclick({target:{closest:()=>({dataset:{planMonth:'2026-12-01'}})}});
  check();
  assert.match(h.el('plan-detail-result').innerHTML,/200 de 400 peças deste cartão no dia/);
+});
+
+test('daily output can split between lots and subsequent stage movement does not deduct the same pieces twice',()=>{
+ const h=harness();
+ h.seed({parents:[{id:'a',number:'MAL-0001'},{id:'b',number:'MAL-0002'}],cuts:[{parentId:'a',pieces:300},{parentId:'b',pieces:1700}],lots:[{id:'brand-a',parentId:'a',quantity:300,status:'Costura'}]});
+ h.run("planToday=()=> '2026-11-24'; savePlan(planMonth(planToday()),{daily:400,queue:['a','b'],estimates:{}},'',true); showSewingPlan()");
+ assert.equal(h.el('plan-output-lot').value,'a');
+ h.el('plan-output-pieces').value='300';
+ const extra=h.el('plan-output-extra');
+ extra.querySelectorAll=()=>[{querySelector:s=>({value:s==='[data-output-lot]'?'b':'120'})}];
+ h.el('plan-output-form').onsubmit({preventDefault(){}});
+ assert.equal(h.run("outputPieces(loadDailySewing()['2026-11-24'])"),420);
+ assert.match(h.el('plan-stock').innerHTML,/1\.580 peças no plano/);
+ assert.match(h.el('plan-detail-result').innerHTML,/>380<\/td>/);
+ assert.equal(h.run("planningRecords()['output:2026-11-24'].value.lots.length"),2);
+ h.run("lots[0].status='Embalagem';renderSewingPlan()");
+ assert.match(h.el('plan-stock').innerHTML,/1\.580 peças no plano/);
+ assert.equal(h.run("sewingStock({estimates:{}},loggedSewingByLot(loadDailySewing(),planToday())).some(row=>row.purchase.id==='a')"),false);
 });
