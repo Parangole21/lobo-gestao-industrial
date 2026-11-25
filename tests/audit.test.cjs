@@ -1480,3 +1480,20 @@ test('daily output can split between lots and subsequent stage movement does not
  assert.match(h.el('plan-stock').innerHTML,/1\.580 peças no plano/);
  assert.equal(h.run("sewingStock({estimates:{}},loggedSewingByLot(loadDailySewing(),planToday())).some(row=>row.purchase.id==='a')"),false);
 });
+
+test('sewing a simulated Fuji lot deducts only that lot and transitions to the real cut without duplicating the deduction',()=>{
+ const h=harness();
+ h.seed({parents:[{id:'fuji',number:'MAL-0007',fabricBrand:'Fuji',kg:100,simulatedPieces:800},{id:'other',number:'MAL-0008',kg:100,simulatedPieces:500}]});
+ h.run("planToday=()=> '2026-11-24'; savePlan(planMonth(planToday()),{daily:400,queue:['fuji','other'],estimates:{}},'',true); showSewingPlan()");
+ assert.equal(h.el('plan-output-lot').value,'fuji');
+ assert.match(h.el('plan-output-lot').innerHTML,/value="fuji" selected>MAL-0007 · Fuji · Sem corte registrado/);
+ h.el('plan-output-pieces').value='420';
+ h.el('plan-output-form').onsubmit({preventDefault(){}});
+ const stock=()=>JSON.parse(h.run("JSON.stringify(sewingStock({estimates:{}},loggedSewingByLot(loadDailySewing(),planToday())).map(row=>[row.purchase.id,row.ready,row.estimate]))"));
+ assert.deepEqual(stock(),[['fuji',0,380],['other',0,500]]);
+ assert.match(h.el('plan-stock').innerHTML,/420 peças lançadas na costura/);
+ h.run("cuts=[{parentId:'fuji',kg:100,pieces:780}]");
+ assert.deepEqual(stock(),[['fuji',360,0],['other',0,500]]);
+ h.run("lots=[{parentId:'fuji',status:'Embalagem',quantity:420}]");
+ assert.deepEqual(stock(),[['fuji',360,0],['other',0,500]]);
+});
