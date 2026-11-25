@@ -1446,3 +1446,19 @@ test('editing a future month goal from its schedule replaces 450 with 400 for ev
  assert.doesNotMatch(h.el('plan-detail-result').innerHTML,/>450<\/td>/);
  assert.equal(h.run("loadPlans()['month:2026-12-01'].daily"),400);
 });
+
+test('saving the main target removes stale future overrides in the total and monthly views',()=>{
+ const h=harness();
+ h.seed({parents:[{id:'lot',number:'MAL-0007'}],cuts:[{parentId:'lot',pieces:1000}]});
+ h.run("planToday=()=> '2026-11-30'; localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:400,queue:['lot']},'month:2026-12-01':{daily:450}}));showSewingPlan()");
+ h.el('plan-daily').value='400';
+ h.el('plan-capacity-form').onsubmit({preventDefault(){}});
+ h.el('plan-query-end').value='2026-12-04';
+ h.el('plan-query-end').onchange();
+ const check=()=>assert.doesNotMatch(h.el('plan-detail-result').innerHTML,/>450<\/td>/);
+ check();
+ assert.match(h.el('plan-detail-result').innerHTML,/200 de 400 peças no dia/);
+ h.el('plan-capacity').onclick({target:{closest:()=>({dataset:{planMonth:'2026-12-01'}})}});
+ check();
+ assert.match(h.el('plan-detail-result').innerHTML,/200 de 400 peças deste cartão no dia/);
+});
