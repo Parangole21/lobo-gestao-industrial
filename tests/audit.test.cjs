@@ -50,10 +50,10 @@ test('recorded daily totals never supply a goal when no goal has been saved',()=
  assert.equal(h.el('plan-daily').value,'');
  assert.match(h.el('plan-daily-source').textContent,/Informe a meta diária/);
  assert.match(h.el('plan-query-result').innerHTML,/Capacidade para <strong>0<\/strong>/);
- assert.equal(h.run("loadPlan(planMonth('2026-12-01')).daily"),0);
+ assert.equal(h.run("loadPlan(planMonth('2026-12-01')).daily"),400);
  h.el('plan-daily').value='350';h.el('plan-capacity-form').onsubmit({preventDefault(){}});
  assert.equal(h.el('plan-daily').value,'350');
- assert.equal(h.run("loadPlan(planMonth('2026-12-01')).daily"),350);
+ assert.equal(h.run("loadPlan(planMonth('2026-12-01')).daily"),400);
  assert.match(h.el('plan-query-result').innerHTML,/Capacidade para <strong>1\.750<\/strong>/);
 });
 
@@ -92,7 +92,7 @@ test('calendar navigates future months and recalculates a two-month query withou
  const h=harness();
  h.run("planToday=()=> '2026-11-30'");
  h.seed({parents:[{id:'p',number:'MAL-0001'}],cuts:[{parentId:'p',pieces:10000}]});
- h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:100,queue:['p']}}));showSewingPlan()`);
+ h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:100,queue:['p']},'month:2026-12-01':{daily:100}}));showSewingPlan()`);
  const start=h.el('plan-query-start'),end=h.el('plan-query-end');
  start.value='2026-12-01';start.onchange();end.value='2027-01-31';end.onchange();
  const result=h.el('plan-query-result');
@@ -132,7 +132,7 @@ test('monthly detail can open its future calendar and recalculate the month afte
  const h=harness();
  h.run("planToday=()=> '2026-11-30'");
  h.seed({parents:[{id:'p',kg:100,simulatedPieces:10000}],cuts:[]});
- h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:100,queue:['p']}}));showSewingPlan()`);
+ h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:100,queue:['p']},'month:2026-12-01':{daily:100}}));showSewingPlan()`);
  const open=()=>h.el('plan-capacity').onclick({target:{closest:()=>({dataset:{planMonth:'2026-12-01'}})}});
  open();
  assert.match(h.el('plan-detail-range').textContent,/2\.200 peças programadas/);
@@ -240,14 +240,14 @@ test('overflow never disappears with no daily goal or with backlog beyond the tw
  const h=harness();
  h.run("planToday=()=> '2026-11-30'");
  h.seed({parents:[{id:'a'}],cuts:[{parentId:'a',pieces:10000}]});
- h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:0,queue:['a']}}))`);
+ h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:0,queue:['a']},'month:2026-12-01':{daily:0}}))`);
  let result=overflowForecast(h);
  assert.equal(result.remaining,10000);
  assert.equal(result.forecast.length,12);
  h.run('showSewingPlan()');
  assert.doesNotMatch(h.el('plan-capacity').innerHTML,/Passam para os próximos meses/);
  assert.match(h.el('plan-capacity').innerHTML,/Sem programação nos próximos 12 meses/);
- h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:1,queue:['a']}}))`);
+ h.run(`localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:1,queue:['a']},'month:2026-12-01':{daily:1}}))`);
  result=overflowForecast(h);
  assert.equal(result.forecast.length,12);
  assert.equal(result.forecast.reduce((sum,m)=>sum+m.pieces,0)+result.remaining,9999);
@@ -706,10 +706,10 @@ test('future months can be opened and show inherited estimated pieces and capaci
  assert.match(h.el('plan-detail-range').textContent,/160 peças programadas/);
  assert.match(h.el('plan-detail-range').textContent,/01\/12\/2026 a 31\/12\/2026/);
  const result=h.el('plan-detail-result').innerHTML;
- assert.match(result,/Capacidade: 2\.200 peças/);
- assert.match(result,/MAL-0001[\s\S]*>60<\/td>/);
+ assert.match(result,/Capacidade: 8\.800 peças/);
+ assert.match(result,/MAL-0001[\s\S]*>160<\/td>/);
  assert.doesNotMatch(result,/A cortar|Cortadas/);
- assert.equal(h.el('plan-daily').value,'100');
+ assert.equal(h.el('plan-daily').value,'400');
  assert.match(h.el('plan-stock').innerHTML,/160 peças no plano[\s\S]*Saldo de meses anteriores/);
  assert.doesNotMatch(h.el('plan-stock').innerHTML,/Incluir na fila/);
  start.value='2027-01-01';end.value='';start.onchange();
@@ -1518,4 +1518,19 @@ test('meeting the remaining target today pulls the next 1200 pieces forward and 
  save(2000);
  assert.match(h.el('plan-capacity').innerHTML,/Saldo da fila de costura<\/span><strong>10\.000/);
  assert.deepEqual(future(),[8800]);
+});
+
+test('early sewing pulls separately queued December and January work into available days without repeating lots',()=>{
+ const h=harness();
+ h.seed({parents:['nov','dec','jan'].map(id=>({id})),cuts:[{parentId:'nov',pieces:1600},{parentId:'dec',pieces:8800},{parentId:'jan',pieces:8000}]});
+ h.run("planToday=()=> '2026-11-25';localStorage.setItem(planStorageKey(),JSON.stringify({'month:2026-11-01':{daily:400,queue:['nov']},'month:2026-12-01':{queue:['dec']},'month:2027-01-01':{queue:['jan']}}));showSewingPlan()");
+ h.el('plan-output-pieces').value='1600';
+ h.el('plan-output-form').onsubmit({preventDefault(){}});
+ const result=JSON.parse(h.run("JSON.stringify([...projectSewingMonths(planMonth(planToday()),planMonth('2027-01-01'),planToday()).values()].map(m=>[...m.allocation.selected].map(([id,row])=>[id,row.ready])))"));
+ assert.deepEqual(result,[[['dec',1200]],[['dec',7600],['jan',1200]],[['jan',6800]]]);
+ assert.match(h.el('plan-capacity').innerHTML,/Dezembro de 2026<\/span><strong>8\.800/);
+ assert.match(h.el('plan-capacity').innerHTML,/Janeiro de 2027<\/span><strong>6\.800/);
+ assert.equal(h.run("loadPlan(planMonth('2026-12-01')).daily"),400);
+ h.run("savePlan(planMonth('2026-12-01'),{daily:450,queue:['dec'],estimates:{}},'',true)");
+ assert.equal(h.run("loadPlan(planMonth('2026-12-01')).daily"),450);
 });
