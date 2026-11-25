@@ -585,14 +585,14 @@ test('saving, correcting and deleting a daily sewing total updates the monthly p
  const outputDate=h.el('plan-output-date'),pieces=h.el('plan-output-pieces');
  outputDate.value='2026-11-24';outputDate.onchange();
  pieces.value='450';h.el('plan-output-form').onsubmit({preventDefault});
- assert.match(h.el('plan-detail-range').textContent,/1\.550 peças programadas/);
- assert.match(h.el('plan-stock').innerHTML,/1\.550 peças no plano/);
- assert.match(h.el('plan-detail-result').innerHTML,/Capacidade: 1\.600 peças · Vagas na capacidade: 50 peças/);
- assert.match(h.el('plan-capacity').innerHTML,/Capacidade livre no calendário<\/span><strong>50/);
+ assert.match(h.el('plan-detail-range').textContent,/1\.600 peças programadas/);
+ assert.match(h.el('plan-stock').innerHTML,/1\.600 peças no plano/);
+ assert.match(h.el('plan-detail-result').innerHTML,/Capacidade: 1\.600 peças · Vagas na capacidade: 0 peças/);
+ assert.match(h.el('plan-capacity').innerHTML,/Capacidade livre no calendário<\/span><strong>0/);
  const piecesByRow=[...h.el('plan-detail-result').innerHTML.matchAll(/<td class="plan-query-number">([\d.]+)<\/td>/g)];
- assert.equal(piecesByRow.reduce((sum,row)=>sum+Number(row[1].replaceAll('.','')),0),1550);
+ assert.equal(piecesByRow.reduce((sum,row)=>sum+Number(row[1].replaceAll('.','')),0),1600);
  pieces.value='460';h.el('plan-output-form').onsubmit({preventDefault});
- assert.match(h.el('plan-detail-range').textContent,/1\.540 peças programadas/);
+ assert.match(h.el('plan-detail-range').textContent,/1\.600 peças programadas/);
  assert.equal((h.el('plan-output-entries').innerHTML.match(/class="plan-output-entry"/g)||[]).length,1);
  assert.match(h.el('plan-output-entries').innerHTML,/24\/11\/2026[\s\S]*460 peças/);
  h.el('plan-output-entries').onclick({target:{closest:()=>({dataset:{outputDelete:'2026-11-24'}})}});
@@ -1498,7 +1498,7 @@ test('sewing a simulated Fuji lot deducts only that lot and transitions to the r
  assert.deepEqual(stock(),[['fuji',360,0],['other',0,500]]);
 });
 
-test('meeting the remaining target today leaves calendar capacity free and recalculates future months from the net lot balance',()=>{
+test('meeting the remaining target today pulls the next 1200 pieces forward and recalculates future months',()=>{
  const h=harness();
  h.seed({parents:[{id:'fuji',number:'MAL-0007',kg:100,simulatedPieces:12000}]});
  h.run("planToday=()=> '2026-11-25'; savePlan(planMonth(planToday()),{daily:400,queue:['fuji'],estimates:{}},'',true); showSewingPlan()");
@@ -1510,10 +1510,12 @@ test('meeting the remaining target today leaves calendar capacity free and recal
  };
  save(1600);
  assert.match(h.el('plan-capacity').innerHTML,/Faltam para cumprir a meta<\/span><strong>0/);
- assert.match(h.el('plan-capacity').innerHTML,/Capacidade livre no calendário<\/span><strong>1\.200<\/strong><span>3 dias/);
+ assert.match(h.el('plan-capacity').innerHTML,/Capacidade livre no calendário<\/span><strong>0<\/strong><span>3 dias/);
  assert.match(h.el('plan-capacity').innerHTML,/Saldo da fila de costura<\/span><strong>10\.400/);
- assert.deepEqual(future(),[8800,1600]);
+ assert.match(h.el('plan-capacity').innerHTML,/1\.200 antecipadas da fila/);
+ assert.match(h.el('plan-detail-result').innerHTML,/26\/11\/2026/);
+ assert.deepEqual(future(),[8800,400]);
  save(2000);
  assert.match(h.el('plan-capacity').innerHTML,/Saldo da fila de costura<\/span><strong>10\.000/);
- assert.deepEqual(future(),[8800,1200]);
+ assert.deepEqual(future(),[8800]);
 });
