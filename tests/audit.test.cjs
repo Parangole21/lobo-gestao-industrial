@@ -790,8 +790,16 @@ test('movement history keeps the lowest lot codes first and retains deadline inf
  h.el('history-search').value='';
  h.run("lots.find(lot=>lot.id==='a').status='Entregue';lots.find(lot=>lot.id==='b').productionEnd='2026-11-22'");
  const updated=render();
- assert.deepEqual(order(updated).slice(0,3),['late','soon','later']);
+ assert.deepEqual(order(updated),['soon','later','undated','late','done']);
  assert.equal((updated.match(/class="history-group-delivered"/g)||[]).length,2);
+ const [active,archive]=updated.split('data-history-delivered');
+ assert.match(active,/data-history-group="purchase:later"/);
+ assert.doesNotMatch(active,/data-history-group="purchase:(late|done)"/);
+ assert.match(archive,/^>\s*<summary>Lotes entregues \(2\)<\/summary>/m);
+ assert.match(archive,/history-group-complete/);
+ h.el('history-search').value='MAL-0001';
+ assert.match(render(),/data-history-delivered open/);
+
  h.el('history-search').value='MAL-0003';
  assert.doesNotMatch(render(),/history-group-delivered/);
 });
