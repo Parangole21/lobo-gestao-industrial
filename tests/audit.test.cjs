@@ -1579,7 +1579,6 @@ test('a cloud queue choice clicked during automatic sync is applied when the cyc
 
 test('an empty local queue conflict keeps its controls during sync and blocks queue edits until the cloud queue is applied',async()=>{
  const a=harness(),b=harness();sharedPlanningServer(a,b);
- const id='queue:2026-11-01';
  storePlanning(a,{plans:{'month:2026-11-01':{queue:[]}}});
  storePlanning(b,{plans:{'month:2026-11-01':{queue:['007','008','009']}}});
  await b.run('cloudSyncPlanning()');await a.run('cloudSyncPlanning()');
@@ -1592,7 +1591,9 @@ test('an empty local queue conflict keeps its controls during sync and blocks qu
  a.el('plan-add-all').onclick();
  assert.match(a.el('plan-conflict-feedback').textContent,/Escolha qual fila manter/);
  assert.equal(writes,0);
- await list.onclick({target:{closest:()=>({dataset:{planningChoice:'remote',planningRecord:id}})}});
+ assert.equal(a.el('sync-use-cloud-queue').hidden,false);
+ await a.el('sync-use-cloud-queue').onclick();
+ assert.equal(a.el('sync-use-cloud-queue').hidden,true);
  assert.deepEqual(JSON.parse(a.run("JSON.stringify(loadPlans()['month:2026-11-01'].queue)")),['007','008','009']);
  assert.equal(a.el('sync-problem-banner').style.display,'none');
  assert.match(a.el('plan-message').textContent,/Versão da nuvem aplicada/);
