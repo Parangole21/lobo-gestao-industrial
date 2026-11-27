@@ -447,7 +447,7 @@ test('movement history groups all brand timelines by purchase and searches by MA
    {id:'p2',number:'MAL-0002',invoice:'10042',fabricBrand:'Outro fornecedor'}
   ],
   lots:[
-   {id:'a',parentId:'p1',number:'LOT-0001',brand:'Nato',client:'Cliente A',history:[
+   {id:'a',parentId:'p1',number:'LOT-0001',brand:'Nato',client:'Cliente A',model:'Polo',quantity:300,history:[
     movement('Costura','2026-11-03T11:00:00Z'),movement('Corte','2026-11-02T11:00:00Z')
    ]},
    {id:'b',parentId:'p1',number:'LOT-0002',brand:'Lobo',history:[movement('Embalagem','2026-11-04T11:00:00Z')]},
@@ -467,6 +467,7 @@ test('movement history groups all brand timelines by purchase and searches by MA
  const byCode=render('mal-0001');
  assert.match(byCode,/data-history-group="purchase:p1" open/);
  assert.match(byCode,/NF 10042 · Caiman/);
+ assert.match(byCode,/Modelos: Polo · 300 peças/);
  assert.match(byCode,/2 marcas/);
  assert.match(byCode,/<h4>Nato<\/h4>/);
  assert.match(byCode,/<h4>Lobo<\/h4>/);
@@ -756,7 +757,7 @@ test('date filters display monthly production immediately for one date or an inc
  assert.match(result.innerHTML,/16\/11\/2026 a 30\/11\/2026/);
 });
 
-test('movement history ranks each purchase by its earliest pending brand deadline',()=>{
+test('movement history keeps the lowest lot codes first and retains deadline information',()=>{
  const h=harness();
  h.run("planToday=()=> '2026-11-13'");
  h.seed({
@@ -789,7 +790,7 @@ test('movement history ranks each purchase by its earliest pending brand deadlin
  h.el('history-search').value='';
  h.run("lots.find(lot=>lot.id==='a').status='Entregue';lots.find(lot=>lot.id==='b').productionEnd='2026-11-22'");
  const updated=render();
- assert.deepEqual(order(updated).slice(0,3),['later','soon','undated']);
+ assert.deepEqual(order(updated).slice(0,3),['late','soon','later']);
  assert.equal((updated.match(/class="history-group-delivered"/g)||[]).length,2);
  h.el('history-search').value='MAL-0003';
  assert.doesNotMatch(render(),/history-group-delivered/);
@@ -1597,4 +1598,20 @@ test('an empty local queue conflict keeps its controls during sync and blocks qu
  assert.deepEqual(JSON.parse(a.run("JSON.stringify(loadPlans()['month:2026-11-01'].queue)")),['007','008','009']);
  assert.equal(a.el('sync-problem-banner').style.display,'none');
  assert.match(a.el('plan-message').textContent,/Versão da nuvem aplicada/);
+});
+
+test('an unrelated lot conflict does not block cloud movements from appearing in history',async()=>{
+ const h=harness(),base={id:'a',parentId:'p',brand:'A',status:'Corte'},other={id:'b',parentId:'p',brand:'B',model:'Polo',status:'Corte'};
+ h.seed({parents:[{id:'p',number:'MAL-0001'}],lots:[{...base,status:'Costura'},other]});
+ h.run("cloudSession={access_token:'test',user_id:'user'}");
+ h.storage.set('lobo-industrial-lotes-cloud-base-v1',JSON.stringify({a:JSON.stringify(base),b:JSON.stringify(other)}));
+ h.context.fetch=async(url,options={})=>{
+  assert.equal(options.method,'GET');
+  return {ok:true,json:async()=>[{id:'a',data:{...base,status:'Bordado'}},{id:'b',data:{...other,status:'Embalagem',history:[{status:'Embalagem',at:'2026-11-27T10:00:00Z'}]}}]};
+ };
+ await h.run('cloudSyncLots(true)');
+ assert.equal(state(h).lots.find(l=>l.id==='a').status,'Costura');
+ assert.equal(state(h).lots.find(l=>l.id==='b').status,'Embalagem');
+ assert.match(h.el('cloud-sync-message').textContent,/em conflito.*1 outro/);
+ assert.match(h.el('lot-history').innerHTML,/Modelos: Polo[\s\S]*Embalagem/);
 });
