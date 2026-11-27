@@ -1534,3 +1534,28 @@ test('early sewing pulls separately queued December and January work into availa
  h.run("savePlan(planMonth('2026-12-01'),{daily:450,queue:['dec'],estimates:{}},'',true)");
  assert.equal(h.run("loadPlan(planMonth('2026-12-01')).daily"),450);
 });
+
+test('planning conflict shortcut opens the comparison and a choice cannot overwrite a newer cloud revision',async()=>{
+ const a=harness(),b=harness(),server=sharedPlanningServer(a,b);
+ const id='goal:2026-11-01';
+ storePlanning(a,{plans:{'month:2026-11-01':{daily:400}}});
+ await a.run('cloudSyncPlanning()');await b.run('cloudSyncPlanning()');
+ a.run("applyPlanningRecord('goal:2026-11-01',{value:420})");
+ b.run("applyPlanningRecord('goal:2026-11-01',{value:450})");
+ await b.run('cloudSyncPlanning()');await a.run('cloudSyncPlanning()');
+ assert.equal(a.el('sync-review-planning').hidden,false);
+ a.el('plan-stock').contains=()=>false;
+ a.el('sync-review-planning').onclick();
+ assert.equal(a.el('page-planejamento').style.display,'block');
+ assert.equal(a.el('plan-cloud-conflicts').open,true);
+ b.run("applyPlanningRecord('goal:2026-11-01',{value:480})");
+ await b.run('cloudSyncPlanning()');
+ const choose=()=>a.el('plan-cloud-conflict-list').onclick({target:{closest:()=>({dataset:{planningChoice:'local',planningRecord:id}})}});
+ await choose();
+ assert.equal(server.rows.get(id).data.value,480);
+ assert.equal(a.run("loadPlans()['month:2026-11-01'].daily"),420);
+ assert.match(a.el('plan-cloud-conflict-list').innerHTML,/Nuvem: 480 peças/);
+ await choose();
+ assert.equal(server.rows.get(id).data.value,420);
+ assert.equal(a.el('sync-review-planning').hidden,true);
+});
