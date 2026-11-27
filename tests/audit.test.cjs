@@ -1211,7 +1211,7 @@ test('simultaneous edits to the same goal preserve both values and allow choosin
  assert.equal(a.run("loadPlans()['month:2026-11-01'].daily"),420);
  assert.equal(server.rows.get('goal:2026-11-01').data.value,450);
  assert.match(a.el('plan-cloud-status').textContent,/Conflito/);
- assert.match(a.el('plan-cloud-conflict-list').innerHTML,/Neste computador: 420 peças · Nuvem: 450 peças/);
+ assert.match(a.el('plan-cloud-conflict-list').innerHTML,/Neste computador: 420 peças<br>Nuvem: 450 peças/);
  assert.equal(a.el('plan-cloud-conflicts').hidden,false);
  await a.el('plan-cloud-conflict-list').onclick({target:{closest:()=>({dataset:{planningChoice:'remote',planningRecord:'goal:2026-11-01'}})}});
  assert.equal(a.run("loadPlans()['month:2026-11-01'].daily"),450);
@@ -1558,4 +1558,21 @@ test('planning conflict shortcut opens the comparison and a choice cannot overwr
  await choose();
  assert.equal(server.rows.get(id).data.value,420);
  assert.equal(a.el('sync-review-planning').hidden,true);
+});
+
+test('a cloud queue choice clicked during automatic sync is applied when the cycle finishes',async()=>{
+ const a=harness(),b=harness(),server=sharedPlanningServer(a,b);
+ const id='queue:2026-11-01';
+ storePlanning(a,{plans:{'month:2026-11-01':{queue:['007']}}});
+ await a.run('cloudSyncPlanning()');await b.run('cloudSyncPlanning()');
+ a.run("applyPlanningRecord('queue:2026-11-01',{value:['007','009']})");
+ b.run("applyPlanningRecord('queue:2026-11-01',{value:['007','008','009']})");
+ await b.run('cloudSyncPlanning()');await a.run('cloudSyncPlanning()');
+ a.context.chooseCloud=()=>a.el('plan-cloud-conflict-list').onclick({target:{closest:()=>({dataset:{planningChoice:'remote',planningRecord:id}})}});
+ a.run("cloudSyncMaterials=async()=>{if(pendingPlanningChoice===null&&planningConflicts.size)await chooseCloud()}");
+ await a.run('cloudSyncAll(true)');
+ assert.deepEqual(JSON.parse(a.run("JSON.stringify(loadPlans()['month:2026-11-01'].queue)")),['007','008','009']);
+ assert.deepEqual(server.rows.get(id).data.value,['007','008','009']);
+ assert.equal(a.el('sync-review-planning').hidden,true);
+ assert.equal(a.el('sync-problem-banner').style.display,'none');
 });
